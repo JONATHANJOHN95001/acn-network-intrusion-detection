@@ -212,6 +212,8 @@ and the per-class minimum makes rare attacks far more common in the sample than 
 04_feature_importance.py which flow features identify each attack
 05_imbalance.py          class-weight / undersample / SMOTE study
 06_charts.py             renders the report figures from the results files
+07_report.py             assembles results/ACN_IDS_Report.docx from the results
+08_slides.py             assembles results/ACN_IDS_Slides.pptx from the results
 common.py                shared stratified sampler
 plot_style.py            shared chart style
 SGDC_60_40.py            original single-model baseline
