@@ -1,0 +1,31 @@
+# Dataset: 1.1 GB, several files over GitHub's 100 MB limit.
+# See README "Getting the data".
+*.pcap_ISCX.csv
+data/
+*.parquet
+
+# Throwaway runs
+results/smoke.csv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Library side effects
+catboost_info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Course reference sheet, not ours to redistribute
+ML_Algorithms_Unique_1.pdf
+
+# Run logs print absolute laptop paths
+results/**/run.log

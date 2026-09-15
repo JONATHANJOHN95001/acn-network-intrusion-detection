@@ -1,0 +1,72 @@
+========================================================================
+CIC-IDS2017 PREPARATION AND AUDIT
+========================================================================
+
+[1] Reading raw CSVs
+    day                        rows   cols  seconds
+    Monday                  529,918     78      5.8
+    Tuesday                 445,909     78      4.9
+    Wednesday               692,703     78      7.6
+    Thursday-AM             170,366     78      1.8
+    Thursday-PM             288,602     78      2.9
+    Friday-AM               191,033     78      2.0
+    Friday-PM-DDoS          225,745     78      2.3
+    Friday-PM-PortScan      286,467     78      2.5
+
+    combined: 2,830,743 rows x 79 cols
+
+[2] Zero-variance features (dropped)
+    - Bwd PSH Flags
+    - Bwd URG Flags
+    - Fwd Avg Bytes/Bulk
+    - Fwd Avg Packets/Bulk
+    - Fwd Avg Bulk Rate
+    - Bwd Avg Bytes/Bulk
+    - Bwd Avg Packets/Bulk
+    - Bwd Avg Bulk Rate
+    8 dropped, 69 features remain
+
+[3] Missing / infinite values (left as NaN for the imputer)
+    Flow Bytes/s                    2,867  (0.1013%)
+    Flow Packets/s                  2,867  (0.1013%)
+
+[4] Exact duplicate rows (dropped: they leak across the split)
+    256,684 of 2,830,743  (9.07%)
+       BENIGN                             124,901
+       PortScan                            68,111
+       DoS Hulk                            58,224
+       SSH-Patator                          2,678
+       FTP-Patator                          2,005
+       DoS slowloris                          422
+       DoS Slowhttptest                       271
+       Web Attack - Brute Force                37
+       Bot                                     13
+       DoS GoldenEye                           11
+       DDoS                                    11
+
+[5] Final class distribution
+    label                                  rows     share
+    BENIGN                            2,148,196  83.4556%
+    DoS Hulk                            172,849   6.7150%
+    DDoS                                128,016   4.9733%
+    PortScan                             90,819   3.5282%
+    DoS GoldenEye                        10,282   0.3994%
+    FTP-Patator                           5,933   0.2305%
+    DoS slowloris                         5,374   0.2088%
+    DoS Slowhttptest                      5,228   0.2031%
+    SSH-Patator                           3,219   0.1251%
+    Bot                                   1,953   0.0759%
+    Web Attack - Brute Force              1,470   0.0571%
+    Web Attack - XSS                        652   0.0253%
+    Infiltration                             36   0.0014%
+    Web Attack - Sql Injection               21   0.0008%
+    Heartbleed                               11   0.0004%
+    TOTAL                             2,574,059
+
+    classes: 15   imbalance ratio: 195,291 : 1
+
+[6] Writing Parquet
+    cicids2017.parquet: 262 MB  (from 885 MB of CSV)
+    shape: 2,574,059 rows x 69 features + Label + Day
+
+Done in 55s
