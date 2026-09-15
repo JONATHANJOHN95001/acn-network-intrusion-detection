@@ -206,13 +206,36 @@ and the per-class minimum makes rare attacks far more common in the sample than 
 ## Layout
 
 ```
-01_prepare_data.py     raw CSVs -> cleaned Parquet + audit report
-02_experiment.py       model registry, pipeline, metrics, experiment runner
-03_kernel_pca.py       Kernel PCA dimensionality reduction + classification grid
-SGDC_60_40.py          original single-model baseline
-results/               audit report, results tables, per-run reports
-data/                  generated Parquet (not committed)
+01_prepare_data.py       raw CSVs -> cleaned Parquet + audit report
+02_experiment.py         model registry, pipeline, metrics, experiment runner
+03_kernel_pca.py         Kernel PCA dimensionality reduction + classification grid
+04_feature_importance.py which flow features identify each attack
+05_imbalance.py          class-weight / undersample / SMOTE study
+06_charts.py             renders the report figures from the results files
+common.py                shared stratified sampler
+plot_style.py            shared chart style
+SGDC_60_40.py            original single-model baseline
+docs/                    networking background (what the features and attacks mean)
+results/                 audit report, results tables, per-run reports, charts/
+data/                    generated Parquet (not committed)
+WORK_SPLIT.md            who owns which part
 ```
+
+## Feature analysis and class imbalance
+
+```bash
+# which features separate each attack from benign traffic
+python 04_feature_importance.py
+
+# does class weighting / undersampling / SMOTE recover the rare attacks?
+python 05_imbalance.py                 # full dataset (slow); --sample 300000 for a quick look
+
+# render every report chart from whatever results exist so far
+python 06_charts.py
+```
+
+`docs/networking_background.md` explains the flow features and every attack in
+protocol terms, and reads the numbers straight from `results/features/`.
 
 ## Roadmap
 

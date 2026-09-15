@@ -12,15 +12,17 @@ flows (that matrix would need ~18 TB). It runs on one fixed stratified
 sample, which is then split at each test size, exactly like the
 "1000 rows -> 200 / 400 / 600" example.
 
-Each (test size, kernel, components) reduction is computed once and shared
-by every classifier, so all classifiers see identical features and the same
-train/test split. Imputation, scaling and Kernel PCA are fitted on the
-training split only.
+Each (test size, kernel, components, gamma) reduction is computed once and
+shared by every classifier, so all classifiers see identical features and
+the same train/test split. Imputation, scaling and Kernel PCA are fitted on
+the training split only.
 
 Usage:
     python 03_kernel_pca.py                                   # LR only
     python 03_kernel_pca.py --classifiers all                 # all 7 classifiers
-    python 03_kernel_pca.py --classifiers lr,dt,rf --components 10 --sample 20000
+    python 03_kernel_pca.py --classifiers all --seed 1        # same grid, different sample
+    python 03_kernel_pca.py --classifiers all --kernels rbf,poly,sigmoid \
+        --components 10,15 --gammas 0.001,0.005,default,0.05,0.1      # tune gamma
 """
 
 import argparse
@@ -43,14 +45,16 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
+from common import load_sample
+
 warnings.filterwarnings("ignore")
 
 HERE = Path(__file__).parent
-PARQUET = HERE / "data" / "cicids2017.parquet"
 RESULTS = HERE / "results" / "kernel_pca"
 SEED = 0
 
 KERNELS = ["linear", "poly", "rbf", "sigmoid", "cosine"]
+GAMMA_KERNELS = ("poly", "rbf", "sigmoid")   # linear and cosine have no gamma
 
 # Short codes match the sheet ("LR"). On a sample this size, even SVM and
 # KNN are cheap, so every classifier from the PDF is usable here.
@@ -66,46 +70,22 @@ CLASSIFIERS = {
 }
 
 
-def load_sample(n, floor):
-    """Proportional per-class sample, but keep at least `floor` rows of every
-    class (or all of it, if the class is smaller). Without the floor,
-    Heartbleed (11 rows in 2.5M) would round down to zero.
-
-    The rows are chosen from the Label column alone, then the Parquet file is
-    streamed in batches keeping only those rows. Loading all 2.5M rows at
-    once needs about 1 GB, which a laptop with a browser open may not have."""
-    import pyarrow.parquet as pq
-
-    labels = pd.read_parquet(PARQUET, columns=["Label"])["Label"]
-    frac = n / len(labels)
-    rng = np.random.default_rng(SEED)
-    keep = []
-    for idx in labels.groupby(labels).indices.values():
-        k = max(int(round(len(idx) * frac)), min(floor, len(idx)))
-        keep.append(rng.choice(idx, size=min(k, len(idx)), replace=False))
-    keep = np.sort(np.concatenate(keep))
-    del labels
-
-    parts, start = [], 0
-    for batch in pq.ParquetFile(PARQUET).iter_batches(batch_size=100_000):
-        end = start + batch.num_rows
-        lo, hi = np.searchsorted(keep, [start, end])
-        if hi > lo:
-            parts.append(batch.take(keep[lo:hi] - start).to_pandas())
-        start = end
-    df = pd.concat(parts, ignore_index=True)
-    return df.sample(frac=1, random_state=SEED).reset_index(drop=True)
+def gamma_label(kernel, gamma):
+    if kernel not in GAMMA_KERNELS:
+        return "-"
+    return "default" if gamma is None else f"{gamma:g}"
 
 
-def reduce(kernel, n_comp, Xtr, Xte):
+def reduce(kernel, n_comp, gamma, Xtr, Xte):
     """Fit impute -> scale -> Kernel PCA on the training split, transform both.
-    n_comp = 0 skips Kernel PCA: the classifiers see all features."""
+    n_comp = 0 skips Kernel PCA: the classifiers see all features.
+    gamma = None uses scikit-learn's default, 1 / number of features."""
     steps = [("impute", SimpleImputer(strategy="mean")), ("scale", StandardScaler())]
     if n_comp:
         # arpack keeps the largest positive eigenvalues. The randomized solver
         # ranks them by magnitude, so with the sigmoid kernel (which is not
         # positive semi-definite) it picks large negative ones and fails.
-        steps.append(("kpca", KernelPCA(n_components=n_comp, kernel=kernel,
+        steps.append(("kpca", KernelPCA(n_components=n_comp, kernel=kernel, gamma=gamma,
                                         eigen_solver="arpack", random_state=SEED,
                                         n_jobs=-1)))
     pre = Pipeline(steps)
@@ -125,15 +105,19 @@ def classify(clf_key, Ztr, ytr, Zte, yte):
 
 def write_excel(df, path, clf_order):
     """Laid out like the table on the sheet: rows = classifier, components,
-    kernel; columns = test size. Components 'all' is the no-reduction baseline."""
+    kernel (and gamma, when several were tried); columns = test size.
+    Components 'all' is the no-reduction baseline."""
     korder = {k: i for i, k in enumerate(["none"] + KERNELS)}
     corder = {c: i for i, c in enumerate(clf_order)}
-    d = (df.assign(_k=df["kernel"].map(korder), _c=df["classifier"].map(corder))
-           .sort_values(["_c", "components", "_k", "test_size"]))
+    d = (df.assign(_k=df["kernel"].map(korder), _c=df["classifier"].map(corder),
+                   _g=df["gamma"].fillna(-1))
+           .sort_values(["_c", "components", "_k", "_g", "test_size"]))
+    tuned = d.loc[d["gamma_label"] != "-", "gamma_label"].nunique() > 1
+    index = ["classifier", "components", "kernel"] + (["gamma_label"] if tuned else [])
+
     with pd.ExcelWriter(path, engine="openpyxl") as xl:
         for metric in ("accuracy", "macro_f1"):
-            piv = d.pivot_table(index=["classifier", "components", "kernel"],
-                                columns="test_size", values=metric, sort=False)
+            piv = d.pivot_table(index=index, columns="test_size", values=metric, sort=False)
             piv.columns = [f"test {c}" for c in piv.columns]
             piv = piv.rename(index={0: "all"}, level="components")
             piv.to_excel(xl, sheet_name=metric)
@@ -146,8 +130,10 @@ def write_excel(df, path, clf_order):
             top = red.loc[red["macro_f1"].idxmax()]
             best.append({
                 "classifier": clf,
-                "baseline macro_f1 (mean of 3 tests)": round(base["macro_f1"].mean(), 4),
+                "baseline macro_f1 (mean of tests)": (round(base["macro_f1"].mean(), 4)
+                                                      if len(base) else None),
                 "best kernel": top["kernel"],
+                "best gamma": top["gamma_label"],
                 "best components": int(top["components"]),
                 "best test size": top["test_size"],
                 "best macro_f1": top["macro_f1"],
@@ -155,15 +141,23 @@ def write_excel(df, path, clf_order):
             })
         pd.DataFrame(best).to_excel(xl, sheet_name="best per classifier", index=False)
 
-        # which kernel suits which classifier: macro F1 averaged over tests and components
+        # which kernel suits which classifier: macro F1 averaged over everything else
         rank = (d[d["components"] > 0]
                 .pivot_table(index="classifier", columns="kernel", values="macro_f1",
                              aggfunc="mean", sort=False)
-                .reindex(columns=KERNELS).round(4))
+                .reindex(columns=[k for k in KERNELS if k in set(d["kernel"])]).round(4))
         rank.to_excel(xl, sheet_name="kernel x classifier")
 
+        if tuned:
+            gd = d[d["gamma_label"] != "-"]
+            cols = list(gd.drop_duplicates("gamma_label").sort_values("_g")["gamma_label"])
+            geff = (gd.pivot_table(index=["classifier", "kernel"], columns="gamma_label",
+                                   values="macro_f1", aggfunc="mean", sort=False)
+                      .reindex(columns=cols).round(4))
+            geff.to_excel(xl, sheet_name="gamma effect")
+
         # the long list from the bottom of the sheet, one row per experiment
-        d.drop(columns=["_k", "_c"]).to_excel(xl, sheet_name="all runs", index=False)
+        d.drop(columns=["_k", "_c", "_g"]).to_excel(xl, sheet_name="all runs", index=False)
 
 
 def main():
@@ -173,9 +167,13 @@ def main():
     ap.add_argument("--tests", default="0.2,0.4,0.6")
     ap.add_argument("--components", default="0,5,10,15",
                     help="0 = no Kernel PCA (all features, the baseline)")
+    ap.add_argument("--gammas", default="default",
+                    help="comma list for poly/rbf/sigmoid; 'default' = 1 / number of features")
     ap.add_argument("--sample", type=int, default=10000)
     ap.add_argument("--floor", type=int, default=50,
                     help="minimum rows kept per class in the sample")
+    ap.add_argument("--seed", type=int, default=0,
+                    help="which random sample to draw (the split itself stays fixed)")
     a = ap.parse_args()
 
     clfs = (list(CLASSIFIERS) if a.classifiers == "all"
@@ -183,54 +181,65 @@ def main():
     kernels = [k.strip() for k in a.kernels.split(",")]
     tests = [float(t) for t in a.tests.split(",")]
     comps = [int(c) for c in a.components.split(",")]
+    gammas = [None if g.strip() == "default" else float(g) for g in a.gammas.split(",")]
     bad = [c for c in clfs if c not in CLASSIFIERS] + [k for k in kernels if k not in KERNELS]
     if bad:
         raise SystemExit(f"unknown: {bad}")
 
-    df = load_sample(a.sample, a.floor)
+    df = load_sample(a.sample, a.floor, a.seed)
     X = df.drop(columns=["Label", "Day"])
     y = LabelEncoder().fit_transform(df["Label"])
-    print(f"sample: {len(df):,} rows x {X.shape[1]} features, {df['Label'].nunique()} classes")
+    default_gamma = 1 / X.shape[1]
+    print(f"sample: {len(df):,} rows x {X.shape[1]} features, {df['Label'].nunique()} classes"
+          f"  (seed {a.seed})")
 
-    reduced = [c for c in comps if c]
-    n_red = len(tests) * (len(kernels) * len(reduced) + (0 in comps))
+    plan = [(comp, kernel, g)
+            for comp in comps
+            for kernel in (kernels if comp else ["none"])
+            for g in (gammas if comp and kernel in GAMMA_KERNELS else [None])]
+    n_red = len(tests) * len(plan)
     print(f"reductions: {n_red}   classifiers: {len(clfs)}   runs: {n_red * len(clfs)}\n")
-    print(f"{'#':>4}  {'test':>4}  {'kernel':<8}{'comp':>4}  {'clf':<5}"
+    print(f"{'#':>4}  {'test':>4}  {'kernel':<8}{'gamma':<8}{'comp':>4}  {'clf':<5}"
           f"{'acc':>7}  {'macroF1':>7}  {'sec':>5}")
 
     rows, i = [], 0
     for ts in tests:
         Xtr, Xte, ytr, yte = train_test_split(
             X, y, test_size=ts, random_state=SEED, stratify=y)
-        for comp in comps:
-            for kernel in (kernels if comp else ["none"]):
-                shown = comp or "all"
-                t0 = time.time()
+        for comp, kernel, g in plan:
+            shown, glab = comp or "all", gamma_label(kernel, g)
+            t0 = time.time()
+            try:
+                Ztr, Zte = reduce(kernel, comp, g, Xtr, Xte)
+            except Exception as e:
+                i += len(clfs)
+                print(f"      {ts:>4}  {kernel:<8}{glab:<8}{shown:>4}  "
+                      f"REDUCTION FAILED {type(e).__name__}: {e}")
+                continue
+            red_s = round(time.time() - t0, 1)
+            for clf in clfs:
+                i += 1
                 try:
-                    Ztr, Zte = reduce(kernel, comp, Xtr, Xte)
+                    code, r = classify(clf, Ztr, ytr, Zte, yte)
                 except Exception as e:
-                    i += len(clfs)
-                    print(f"      {ts:>4}  {kernel:<8}{shown:>4}  "
-                          f"REDUCTION FAILED {type(e).__name__}: {e}")
+                    print(f"{i:>4}  {ts:>4}  {kernel:<8}{glab:<8}{shown:>4}  {clf:<5}"
+                          f"FAILED {type(e).__name__}: {e}")
                     continue
-                red_s = round(time.time() - t0, 1)
-                for clf in clfs:
-                    i += 1
-                    try:
-                        code, r = classify(clf, Ztr, ytr, Zte, yte)
-                    except Exception as e:
-                        print(f"{i:>4}  {ts:>4}  {kernel:<8}{shown:>4}  {clf:<5}"
-                              f"FAILED {type(e).__name__}: {e}")
-                        continue
-                    rows.append({"test_size": ts, "kernel": kernel, "classifier": code,
-                                 "components": comp, "n_train": len(ytr), "n_test": len(yte),
-                                 **r, "kpca_seconds": red_s})
-                    print(f"{i:>4}  {ts:>4}  {kernel:<8}{shown:>4}  {code:<5}"
-                          f"{r['accuracy']:>7.4f}  {r['macro_f1']:>7.4f}  {r['clf_seconds']:>5}")
+                gval = (default_gamma if g is None else g) if kernel in GAMMA_KERNELS else np.nan
+                rows.append({"test_size": ts, "kernel": kernel, "gamma_label": glab,
+                             "gamma": gval, "classifier": code, "components": comp,
+                             "sample_seed": a.seed, "n_train": len(ytr), "n_test": len(yte),
+                             **r, "kpca_seconds": red_s})
+                print(f"{i:>4}  {ts:>4}  {kernel:<8}{glab:<8}{shown:>4}  {code:<5}"
+                      f"{r['accuracy']:>7.4f}  {r['macro_f1']:>7.4f}  {r['clf_seconds']:>5}")
 
     RESULTS.mkdir(parents=True, exist_ok=True)
     out = pd.DataFrame(rows)
     tag = f"{'all' if a.classifiers == 'all' else '_'.join(clfs)}_s{a.sample}"
+    if a.seed:
+        tag += f"_seed{a.seed}"
+    if a.gammas != "default":
+        tag += "_gamma"
     out.to_csv(RESULTS / f"kpca_{tag}.csv", index=False)
     write_excel(out, RESULTS / f"kpca_{tag}.xlsx", [CLASSIFIERS[c][0] for c in clfs])
     print(f"\nwrote results/kernel_pca/kpca_{tag}.xlsx")

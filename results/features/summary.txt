@@ -1,0 +1,87 @@
+Random Forest, 310,160-flow stratified sample, 70/30 split
+held-out macro F1: 0.8877
+
+Top 15 features by permutation importance (drop in macro F1 when shuffled):
+  Destination Port               0.0213 +/- 0.0022   impurity 0.0417
+  Init_Win_bytes_forward         0.0203 +/- 0.0007   impurity 0.0195
+  Init_Win_bytes_backward        0.0142 +/- 0.0019   impurity 0.0160
+  Fwd IAT Min                    0.0074 +/- 0.0012   impurity 0.0136
+  Fwd IAT Std                    0.0054 +/- 0.0009   impurity 0.0108
+  URG Flag Count                 0.0048 +/- 0.0002   impurity 0.0011
+  Avg Bwd Segment Size           0.0035 +/- 0.0018   impurity 0.0406
+  Packet Length Std              0.0020 +/- 0.0003   impurity 0.0450
+  Packet Length Variance         0.0018 +/- 0.0002   impurity 0.0426
+  Average Packet Size            0.0017 +/- 0.0004   impurity 0.0491
+  Flow IAT Min                   0.0015 +/- 0.0006   impurity 0.0079
+  Packet Length Mean             0.0015 +/- 0.0001   impurity 0.0232
+  Total Length of Bwd Packets    0.0014 +/- 0.0001   impurity 0.0429
+  Fwd IAT Mean                   0.0014 +/- 0.0011   impurity 0.0115
+  Subflow Bwd Bytes              0.0013 +/- 0.0002   impurity 0.0358
+
+Identical feature pairs:
+  Total Fwd Packets  ==  Subflow Fwd Packets
+  Total Backward Packets  ==  Subflow Bwd Packets
+  Total Length of Fwd Packets  ==  Subflow Fwd Bytes
+  Fwd Packet Length Mean  ==  Avg Fwd Segment Size
+  Bwd Packet Length Mean  ==  Avg Bwd Segment Size
+  Fwd PSH Flags  ==  SYN Flag Count
+  Fwd URG Flags  ==  CWE Flag Count
+  RST Flag Count  ==  ECE Flag Count
+
+Attack signatures (top 3 single-feature separators vs benign):
+  Bot  (1,953 flows)
+      Destination Port               sep 0.65  higher  median 8,080.0 vs benign 80.0
+      Average Packet Size            sep 0.47  lower   median 9.0 vs benign 77.2
+      Init_Win_bytes_backward        sep 0.47  higher  median 237.0 vs benign -1.0
+  DDoS  (14,920 flows)
+      Flow IAT Std                   sep 0.64  higher  median 962,573.9 vs benign 134.2
+      Fwd IAT Std                    sep 0.62  higher  median 966,149.5 vs benign 0.0
+      Flow IAT Max                   sep 0.59  higher  median 1,880,766.0 vs benign 31,184.0
+  DoS GoldenEye  (2,000 flows)
+      Flow Packets/s                 sep 0.76  lower   median 1.0 vs benign 85.9
+      Flow IAT Mean                  sep 0.76  higher  median 1,112,495.5 vs benign 15,619.2
+      Fwd Packets/s                  sep 0.75  lower   median 0.6 vs benign 46.0
+  DoS Hulk  (20,145 flows)
+      Bwd Packet Length Std          sep 0.87  higher  median 2,122.0 vs benign 0.0
+      Fwd IAT Max                    sep 0.86  higher  median 85,900,000.0 vs benign 4.0
+      Fwd IAT Std                    sep 0.85  higher  median 37,200,000.0 vs benign 0.0
+  DoS Slowhttptest  (2,000 flows)
+      Flow IAT Mean                  sep 0.86  higher  median 10,500,000.0 vs benign 15,619.2
+      Flow Packets/s                 sep 0.86  lower   median 0.1 vs benign 85.9
+      Fwd Packets/s                  sep 0.84  lower   median 0.1 vs benign 46.0
+  DoS slowloris  (2,000 flows)
+      Flow IAT Mean                  sep 0.81  higher  median 5,872,501.0 vs benign 15,619.2
+      Flow Packets/s                 sep 0.80  lower   median 0.2 vs benign 85.9
+      Fwd IAT Mean                   sep 0.78  higher  median 7,047,818.0 vs benign 4.0
+  FTP-Patator  (2,000 flows)
+      Destination Port               sep 1.00  lower   median 21.0 vs benign 80.0
+      Fwd Packet Length Min          sep 0.60  lower   median 0.0 vs benign 6.0
+      Min Packet Length              sep 0.59  lower   median 0.0 vs benign 6.0
+  Heartbleed  (11 flows)
+      Bwd Packet Length Max          sep 1.00  higher  median 14,480.0 vs benign 90.0
+      Bwd Packet Length Std          sep 1.00  higher  median 2,374.7 vs benign 0.0
+      Bwd Packet Length Mean         sep 1.00  higher  median 3,773.3 vs benign 83.0
+  Infiltration  (36 flows)
+      Fwd IAT Total                  sep 0.81  higher  median 83,100,000.0 vs benign 4.0
+      act_data_pkt_fwd               sep 0.81  higher  median 25.0 vs benign 1.0
+      Total Fwd Packets              sep 0.80  higher  median 26.0 vs benign 2.0
+  PortScan  (10,585 flows)
+      Bwd Packets/s                  sep 0.86  higher  median 20,000.0 vs benign 26.3
+      Total Length of Fwd Packets    sep 0.81  lower   median 0.0 vs benign 68.0
+      Subflow Fwd Bytes              sep 0.81  lower   median 0.0 vs benign 68.0
+  SSH-Patator  (2,000 flows)
+      Destination Port               sep 0.99  lower   median 22.0 vs benign 80.0
+      Bwd Header Length              sep 0.86  higher  median 1,032.0 vs benign 40.0
+      Total Backward Packets         sep 0.84  higher  median 32.0 vs benign 2.0
+  Web Attack - Brute Force  (1,470 flows)
+      Init_Win_bytes_backward        sep 0.85  higher  median 28,960.0 vs benign -1.0
+      Flow Bytes/s                   sep 0.82  lower   median 0.0 vs benign 4,459.5
+      Init_Win_bytes_forward         sep 0.76  higher  median 29,200.0 vs benign 115.0
+  Web Attack - Sql Injection  (21 flows)
+      Fwd Packet Length Min          sep 0.60  lower   median 0.0 vs benign 6.0
+      Flow Bytes/s                   sep 0.59  lower   median 210.2 vs benign 4,459.5
+      Min Packet Length              sep 0.59  lower   median 0.0 vs benign 6.0
+  Web Attack - XSS  (652 flows)
+      Init_Win_bytes_backward        sep 0.85  higher  median 28,960.0 vs benign -1.0
+      Flow Bytes/s                   sep 0.85  lower   median 0.0 vs benign 4,459.5
+      Max Packet Length              sep 0.81  lower   median 0.0 vs benign 97.0
