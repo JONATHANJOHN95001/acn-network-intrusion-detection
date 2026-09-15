@@ -106,45 +106,81 @@ the reduced data.
 | Test size | 0.2, 0.4, 0.6 |
 | Kernel | linear, poly, rbf, sigmoid, cosine |
 | Components | 5, 10, 15, plus a baseline with no reduction (all 69 features) |
-| Classifier | Logistic Regression (others selectable) |
+| Classifier | Logistic Regression, SGD, Decision Tree, Random Forest, Naive Bayes, KNN, SVM (RBF) |
+
+That is 7 classifiers x 3 test sizes x (5 kernels x 3 component counts + baseline) = **336 runs**.
 
 Kernel PCA builds an n x n kernel matrix, so on all 2.5M flows it would need
-about 18 TB of memory. It runs on one fixed stratified sample of about 10,000
-flows, which is then split at each test size. Every class keeps at least 50
-rows (or all of its rows, if it has fewer), otherwise Heartbleed, with 11
-flows in the whole dataset, would vanish from the sample.
+about 18 TB of memory. It runs on one fixed stratified sample of 10,336 flows,
+which is then split at each test size. Every class keeps at least 50 rows (or
+all of its rows, if it has fewer), otherwise Heartbleed, with 11 flows in the
+whole dataset, would vanish from the sample.
+
+Each reduction is computed once per test size and shared by all seven
+classifiers, so they are compared on identical features and the same split.
 
 ```bash
-python 03_kernel_pca.py                                  # the full grid above
-python 03_kernel_pca.py --classifiers lr,dt,rf --sample 20000
+python 03_kernel_pca.py --classifiers all                # the full 336-run grid
+python 03_kernel_pca.py                                  # Logistic Regression only
+python 03_kernel_pca.py --classifiers lr,dt,rf --components 10 --sample 20000
 ```
 
-Results go to `results/kernel_pca/` as CSV and as an Excel workbook with
-accuracy and macro F1 sheets (rows: classifier, components, kernel; columns: test size).
+Results go to `results/kernel_pca/` as CSV and as an Excel workbook with sheets for
+accuracy and macro F1 (rows: classifier, components, kernel; columns: test size),
+the best setting per classifier, a kernel x classifier summary, and every run.
 
-### Results with Logistic Regression (macro F1, test size 0.2)
+### Best Kernel PCA setting per classifier (macro F1)
 
-| Kernel | 5 components | 10 components | 15 components |
-|---|---|---|---|
-| none (all 69 features) | 0.645 | 0.645 | 0.645 |
-| linear | 0.279 | 0.450 | 0.493 |
-| sigmoid | 0.156 | 0.206 | 0.297 |
-| poly | 0.154 | 0.142 | 0.277 |
-| cosine | 0.194 | 0.221 | 0.229 |
-| rbf | 0.157 | 0.201 | 0.214 |
+Compared with the same classifier on all 69 features at the same test size.
 
-- No Kernel PCA setting beats the unreduced baseline (0.956 accuracy, 0.645 macro F1).
-  The leading components mostly describe benign traffic, and the detail that separates
-  rare attacks is discarded.
-- The linear kernel is best at every component count, and more components help almost everywhere.
-- Test size changes scores by only 0.01 to 0.04.
-- Poly with 5 components reaches 0.808 accuracy, which is the share of benign flows in the
-  sample (0.8075): it labels everything benign. Its macro F1 of 0.15 exposes this.
+| Classifier | No reduction | Best Kernel PCA | Setting (kernel, components, test size) | Change |
+|---|---|---|---|---|
+| Random Forest | 0.864 | 0.811 | linear, 10, 0.4 | -0.053 |
+| Decision Tree | 0.829 | 0.795 | linear, 10, 0.2 | -0.034 |
+| KNN | 0.742 | **0.767** | sigmoid, 15, 0.2 | **+0.025** |
+| Naive Bayes | 0.619 | 0.581 | sigmoid, 15, 0.4 | -0.038 |
+| SVM (RBF) | 0.511 | **0.585** | sigmoid, 15, 0.2 | **+0.073** |
+| Logistic Regression | 0.645 | 0.493 | linear, 15, 0.2 | -0.152 |
+| SGD | 0.519 | 0.397 | linear, 10, 0.4 | -0.122 |
+
+### Which kernel suits which classifier (macro F1, averaged over test sizes and component counts)
+
+| Classifier | linear | poly | rbf | sigmoid | cosine |
+|---|---|---|---|---|---|
+| Random Forest | **0.790** | 0.678 | 0.748 | 0.772 | 0.776 |
+| Decision Tree | **0.751** | 0.625 | 0.700 | 0.721 | 0.744 |
+| KNN | 0.727 | 0.633 | 0.684 | **0.743** | 0.722 |
+| Naive Bayes | 0.398 | 0.249 | 0.371 | **0.512** | 0.476 |
+| SVM (RBF) | 0.406 | 0.141 | 0.231 | **0.480** | 0.330 |
+| Logistic Regression | **0.397** | 0.201 | 0.180 | 0.198 | 0.209 |
+| SGD | **0.328** | 0.177 | 0.174 | 0.188 | 0.196 |
+
+### Findings
+
+- **Random Forest is the strongest classifier**, with or without reduction. With linear
+  Kernel PCA it keeps 0.811 macro F1 and 0.980 accuracy from 10 components, a 7x smaller
+  feature set than the original 69.
+- **Kernel PCA helps only the distance-based classifiers.** KNN gains 0.025 and SVM gains
+  0.073 with the sigmoid kernel at 15 components. Both depend on distances between flows,
+  and in the full 69-feature space many correlated flow statistics (packet-length and
+  inter-arrival summaries of the same traffic) weigh on those distances. A compact
+  projection is a plausible reason they improve.
+- **Linear models lose the most** (Logistic Regression -0.152, SGD -0.122). With a handful
+  of components they cannot separate the rare attack classes.
+- **The best kernel depends on the classifier.** Linear is best for Logistic Regression,
+  SGD and both tree models; sigmoid is best for Naive Bayes, KNN and SVM. **Poly is the
+  worst kernel for all seven.**
+- **More components help every classifier**: each one improves from 5 to 10 to 15.
+- **Test size matters little** for most classifiers. KNN and SVM lose the most when
+  training data shrinks to 40% (test size 0.6).
+- Accuracy stays between 0.88 and 0.98 for most settings while macro F1 ranges from
+  0.14 to 0.87, so macro F1 is the measure that separates the settings.
 - The sigmoid kernel is not positive semi-definite, so its kernel matrix has negative
   eigenvalues. The `arpack` eigensolver is used because it keeps the largest positive ones.
 
-Caveats: kernel parameters (`gamma`, `degree`, `coef0`) are left at their defaults, and the
-per-class minimum makes rare attacks far more common in the sample than in real traffic.
+Caveats: one sample and one split per test size, so differences of about 0.01 are within
+noise; kernel parameters (`gamma`, `degree`, `coef0`) and classifier settings are defaults;
+and the per-class minimum makes rare attacks far more common in the sample than in real traffic.
 
 ## Layout
 
@@ -162,7 +198,7 @@ data/                  generated Parquet (not committed)
 - [x] Data audit and cleaning
 - [x] Experiment framework
 - [x] Kernel PCA grid with Logistic Regression (5 kernels x 3 test sizes x 3 component counts)
-- [ ] Kernel PCA grid with the remaining classifiers
+- [x] Kernel PCA grid with all 7 classifiers (336 runs)
 - [ ] Full algorithm grid across 80/20, 60/40, 40/60 splits
 - [ ] Comparison plots and confusion-matrix heatmaps
 - [ ] Class-imbalance study: class weights, undersampling, SMOTE on the training split only

@@ -28,4 +28,4 @@ desktop.ini
 ML_Algorithms_Unique_1.pdf
 
 # Run logs print absolute laptop paths
-results/**/run.log
+results/**/run*.log
