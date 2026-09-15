@@ -26,7 +26,28 @@ converted to flows by CICFlowMeter. Each row is one flow with 78 numeric feature
 The data is not in this repository (1.1 GB; GitHub caps files at 100 MB).
 
 1. Download `MachineLearningCSV.zip` from the dataset page above.
-2. Extract the eight `*.pcap_ISCX.csv` files into the project root, next to the scripts.
+2. Extract it into the project folder. `01_prepare_data.py` finds the eight CSVs either
+   next to the scripts or in the `MachineLearningCVE/` folder the zip creates.
+
+Both the official file names and renamed, day-numbered copies work:
+
+| Day | Official name | Renamed copy |
+|---|---|---|
+| Monday | `Monday-WorkingHours.pcap_ISCX.csv` | `01_Monday-WorkingHours-Benign.csv` |
+| Tuesday | `Tuesday-WorkingHours.pcap_ISCX.csv` | `02_Tuesday-WorkingHours-BruteForce.csv` |
+| Wednesday | `Wednesday-workingHours.pcap_ISCX.csv` | `03_Wednesday-WorkingHours-DoS.csv` |
+| Thursday AM | `Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv` | `04_Thursday-WorkingHours-Morning-WebAttacks.csv` |
+| Thursday PM | `Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv` | `05_Thursday-WorkingHours-Afternoon-Infiltration.csv` |
+| Friday AM | `Friday-WorkingHours-Morning.pcap_ISCX.csv` | `06_Friday-WorkingHours-Morning-Bot.csv` |
+| Friday PM | `Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv` | `07_Friday-WorkingHours-Afternoon-PortScan.csv` |
+| Friday PM | `Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv` | `08_Friday-WorkingHours-Afternoon-DDoS.csv` |
+
+To confirm all eight are found before the full run, or to read them from another folder:
+
+```bash
+python 01_prepare_data.py --check
+python 01_prepare_data.py --data-dir path/to/MachineLearningCVE
+```
 
 ## What the audit found
 

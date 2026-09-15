@@ -13,8 +13,20 @@ Cleaning applied, in order:
   6. drop zero-variance columns, measured across the whole dataset
   7. drop exact duplicate rows, which otherwise leak between train and test
   8. downcast features to float32
+
+Where the CSVs can be:
+  - in the project folder, or in a MachineLearningCVE/ subfolder (the folder
+    name inside the official download), or anywhere given with --data-dir
+  - under their official names (Monday-WorkingHours.pcap_ISCX.csv ...) or the
+    renamed, day-numbered names (01_Monday-WorkingHours-Benign.csv ...)
+
+Usage:
+    python 01_prepare_data.py                     # find the CSVs, clean, write Parquet
+    python 01_prepare_data.py --check             # only show which file was found for each day
+    python 01_prepare_data.py --data-dir D:/cicids2017
 """
 
+import argparse
 import time
 import numpy as np
 import pandas as pd
@@ -24,15 +36,25 @@ HERE = Path(__file__).parent
 OUT_PARQUET = HERE / "data" / "cicids2017.parquet"
 OUT_REPORT = HERE / "results" / "01_data_audit.txt"
 
+# (official name, renamed name). The order of the days fixes the row order,
+# which decides which copy of a duplicate row is kept, so keep it stable.
 FILES = {
-    "Monday":      "Monday-WorkingHours.pcap_ISCX.csv",
-    "Tuesday":     "Tuesday-WorkingHours.pcap_ISCX.csv",
-    "Wednesday":   "Wednesday-workingHours.pcap_ISCX.csv",
-    "Thursday-AM": "Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv",
-    "Thursday-PM": "Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv",
-    "Friday-AM":   "Friday-WorkingHours-Morning.pcap_ISCX.csv",
-    "Friday-PM-DDoS":     "Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv",
-    "Friday-PM-PortScan": "Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv",
+    "Monday":      ("Monday-WorkingHours.pcap_ISCX.csv",
+                    "01_Monday-WorkingHours-Benign.csv"),
+    "Tuesday":     ("Tuesday-WorkingHours.pcap_ISCX.csv",
+                    "02_Tuesday-WorkingHours-BruteForce.csv"),
+    "Wednesday":   ("Wednesday-workingHours.pcap_ISCX.csv",
+                    "03_Wednesday-WorkingHours-DoS.csv"),
+    "Thursday-AM": ("Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv",
+                    "04_Thursday-WorkingHours-Morning-WebAttacks.csv"),
+    "Thursday-PM": ("Thursday-WorkingHours-Afternoon-Infilteration.pcap_ISCX.csv",
+                    "05_Thursday-WorkingHours-Afternoon-Infiltration.csv"),
+    "Friday-AM":   ("Friday-WorkingHours-Morning.pcap_ISCX.csv",
+                    "06_Friday-WorkingHours-Morning-Bot.csv"),
+    "Friday-PM-DDoS":     ("Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv",
+                           "08_Friday-WorkingHours-Afternoon-DDoS.csv"),
+    "Friday-PM-PortScan": ("Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv",
+                           "07_Friday-WorkingHours-Afternoon-PortScan.csv"),
 }
 
 log_lines = []
@@ -41,6 +63,25 @@ log_lines = []
 def log(msg=""):
     print(msg)
     log_lines.append(str(msg))
+
+
+def find_csvs(data_dir=None):
+    """Return {day: path}, trying every folder and both names for each day."""
+    dirs = ([Path(data_dir)] if data_dir else []) + [HERE, HERE / "MachineLearningCVE"]
+    found, missing = {}, []
+    for day, names in FILES.items():
+        hit = next((d / n for d in dirs for n in names if (d / n).is_file()), None)
+        if hit:
+            found[day] = hit
+        else:
+            missing.append(day)
+    if missing:
+        lines = [f"Missing CSV for: {', '.join(missing)}", "Looked in:"]
+        lines += [f"  {d}" for d in dirs]
+        lines += ["for either of these names:"]
+        lines += [f"  {FILES[day][0]}  or  {FILES[day][1]}" for day in missing]
+        raise SystemExit("\n".join(lines))
+    return found
 
 
 def clean_label(s: pd.Series) -> pd.Series:
@@ -55,6 +96,19 @@ def clean_label(s: pd.Series) -> pd.Series:
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data-dir", help="folder holding the eight CSVs (searched first)")
+    ap.add_argument("--check", action="store_true",
+                    help="only report which file was found for each day")
+    a = ap.parse_args()
+
+    paths = find_csvs(a.data_dir)
+    if a.check:
+        for day, p in paths.items():
+            print(f"{day:<20} {p.name}   ({p.stat().st_size/1e6:,.0f} MB)")
+        print(f"\nall {len(paths)} files found")
+        return
+
     t0 = time.time()
     log("=" * 72)
     log("CIC-IDS2017 PREPARATION AND AUDIT")
@@ -64,9 +118,9 @@ def main():
     log("\n[1] Reading raw CSVs")
     log(f"    {'day':<20} {'rows':>10} {'cols':>6} {'seconds':>8}")
 
-    for day, fname in FILES.items():
+    for day, path in paths.items():
         t = time.time()
-        df = pd.read_csv(HERE / fname, encoding="latin-1", low_memory=False)
+        df = pd.read_csv(path, encoding="latin-1", low_memory=False)
         df.columns = df.columns.str.strip()
 
         # 2. the duplicated header. pandas renames the second occurrence to '.1'
@@ -133,7 +187,7 @@ def main():
     OUT_PARQUET.parent.mkdir(exist_ok=True)
     data.to_parquet(OUT_PARQUET, index=False, compression="snappy")
     mb = OUT_PARQUET.stat().st_size / 1e6
-    csv_mb = sum((HERE / f).stat().st_size for f in FILES.values()) / 1e6
+    csv_mb = sum(p.stat().st_size for p in paths.values()) / 1e6
     log(f"    {OUT_PARQUET.name}: {mb:,.0f} MB  (from {csv_mb:,.0f} MB of CSV)")
     log(f"    shape: {data.shape[0]:,} rows x {len(feature_cols)} features + Label + Day")
     log(f"\nDone in {time.time()-t0:.0f}s")
