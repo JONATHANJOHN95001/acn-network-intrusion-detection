@@ -11,7 +11,7 @@ HERE = Path(__file__).parent
 PARQUET = HERE / "data" / "cicids2017.parquet"
 
 
-def load_sample(n, floor=50, seed=0):
+def load_sample(n, floor=50, seed=0, parquet=None):
     """Stratified sample of about n flows: each class in proportion to its
     size, but at least `floor` rows of every class (or all of it, if the
     class is smaller). Without the floor, Heartbleed (11 rows in 2.5M) would
@@ -22,10 +22,11 @@ def load_sample(n, floor=50, seed=0):
     once needs about 1 GB, which a laptop with a browser open may not have."""
     import pyarrow.parquet as pq
 
+    src = parquet or PARQUET
     if n is None:
-        return pd.read_parquet(PARQUET)
+        return pd.read_parquet(src)
 
-    labels = pd.read_parquet(PARQUET, columns=["Label"])["Label"]
+    labels = pd.read_parquet(src, columns=["Label"])["Label"]
     frac = n / len(labels)
     rng = np.random.default_rng(seed)
     keep = []
@@ -36,7 +37,7 @@ def load_sample(n, floor=50, seed=0):
     del labels
 
     parts, start = [], 0
-    for batch in pq.ParquetFile(PARQUET).iter_batches(batch_size=100_000):
+    for batch in pq.ParquetFile(src).iter_batches(batch_size=100_000):
         end = start + batch.num_rows
         lo, hi = np.searchsorted(keep, [start, end])
         if hi > lo:

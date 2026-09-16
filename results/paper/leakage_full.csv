@@ -1,0 +1,5 @@
+condition,model,leaked_share,accuracy_overall,macro_f1_overall,accuracy_on_leaked_rows,accuracy_on_unseen_rows,macro_f1_on_unseen_rows,fit_seconds
+duplicates kept (as most published work does),decision_tree,0.1323,0.9984721336609267,0.8670750530664326,0.9994458391197522,0.998323701657571,0.8659056656773255,120.0
+duplicates kept (as most published work does),random_forest,0.1323,0.9986054907806955,0.8620531495435454,0.9997997008866574,0.9984234449712067,0.8609334154465647,206.1
+duplicates removed (this project),decision_tree,0.0354,0.9981974002160012,0.8958400419948019,1.0,0.9981312306993688,0.8958374780367543,118.2
+duplicates removed (this project),random_forest,0.0354,0.9983022928758459,0.8679416088687504,1.0,0.9982399737405693,0.8679391586620088,174.9

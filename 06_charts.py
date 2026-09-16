@@ -120,8 +120,8 @@ def chart_duplicates():
     n = len(share)
     fig, ax = plt.subplots(figsize=(W, 0.25 * n + 1.45))
     top = ps.titles(fig, "Rows removed as exact duplicates, by class",
-                    f"{overall} of all rows were exact copies. Left in, copies land on both sides "
-                    "of the\ntrain/test split, so the model is tested on rows it has already seen.")
+                    f"{overall} of all rows were exact copies. Left in, part of the test set is "
+                    "memorised rather than\npredicted, and the class balance is skewed. Removed here.")
     fig.subplots_adjust(left=0.22, right=0.95, top=top, bottom=0.1)
     ax.set_xlim(0, max(share.max() * 1.18, 0.05))
     ax.set_ylim(n - 0.5, -0.5)

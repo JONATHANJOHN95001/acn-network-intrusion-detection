@@ -54,8 +54,10 @@ python 01_prepare_data.py --data-dir path/to/MachineLearningCVE
 `01_prepare_data.py` checks the raw files before any model sees them:
 
 - **9.07% of rows are exact duplicates** (256,684 of 2,830,743). Left in, they end up
-  on both sides of the train/test split and inflate every score. PortScan alone
-  loses 43% of its rows to deduplication.
+  on both sides of the train/test split, so part of the test set is memorised rather
+  than predicted. PortScan alone loses 43% of its rows to deduplication. We removed
+  them, and then measured whether it matters: it barely does (see below), but the
+  deduplicated set is still the honest one to report.
 - `Fwd Header Length` appears twice with identical values.
 - 8 features are constant across the whole dataset and carry no information.
 - Only `Flow Bytes/s` and `Flow Packets/s` contain missing or infinite values.
@@ -206,6 +208,48 @@ The nonlinear kernels were partly handicapped by scikit-learn's default
 rbf and poly want a much smaller gamma than the default, sigmoid a larger one.
 So "the nonlinear kernels are worse" holds for the defaults but overstates the
 gap once gamma is tuned.
+
+## Does the duplicate leakage actually inflate the scores?
+
+A common claim about CIC-IDS2017 is that leaving the duplicate rows in inflates
+published results. We tested it rather than assuming it (`10_leakage.py`): keep
+the duplicates, split at random, then find which test rows appear verbatim in the
+training split and score those rows separately from the genuinely unseen ones.
+
+| Model | Test rows also in training | Accuracy on those rows | Accuracy on unseen rows | Gap |
+|---|---|---|---|---|
+| Decision Tree | 13.2% | 0.9994 | 0.9983 | +0.0011 |
+| Random Forest | 13.2% | 0.9998 | 0.9984 | +0.0014 |
+
+**The inflation is negligible: about +0.0002 on the reported accuracy.** Even with
+13.2% of the test set memorisable, the models do essentially as well on rows they
+have never seen, because accuracy on unseen rows is already 0.998 and there is no
+headroom left for memorisation to add anything.
+
+Two caveats worth stating. First, this is an accuracy result on an easy dataset; it
+does not mean duplicate leakage is harmless in general. Second, macro F1 is actually
+*lower* with the duplicates kept (0.867 vs 0.896 for the decision tree), because the
+duplicates are concentrated in a few classes and skew the balance. Removing them
+remains the right thing to do, just not for the reason usually given.
+
+### And do the models lean on "shortcut" features?
+
+Permutation importance ranks Destination Port and the two initial TCP window sizes
+highest. Those describe the service and the sending machine's TCP stack rather than
+the attack, so we retrained without them (`09_paper_experiments.py`):
+
+| Model | All 69 features | No shortcut features | Change |
+|---|---|---|---|
+| Decision Tree | 0.8851 | 0.8434 | -0.042 |
+| XGBoost | 0.8752 | 0.8373 | -0.038 |
+| Random Forest | 0.8697 | 0.8460 | -0.024 |
+| Logistic Regression | 0.6260 | 0.6056 | -0.020 |
+
+The models lose only 2 to 4 points of macro F1, so the results are **not** an artefact
+of those features. The more useful lesson is about importance scores themselves: the
+feature ranked most important can be removed at almost no cost, because the dataset
+holds 28 highly correlated feature pairs (8 of them identical) and the signal simply
+travels another route.
 
 ## Kernel PCA dimensionality reduction
 

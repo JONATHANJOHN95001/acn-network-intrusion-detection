@@ -239,7 +239,7 @@ natural next checks.
 
 | Issue | Measured | Consequence |
 |---|---|---|
-| Exact duplicate rows | 256,684 rows (9.07%) | Copies land in both training and test data and inflate scores; removed before training |
+| Exact duplicate rows | 256,684 rows (9.07%) | Copies land in both training and test data, so part of the test set is memorised; removed before training. Measured effect on accuracy is small (+0.0002), but macro F1 is distorted |
 | Constant columns | 8 | Carry no information; removed |
 | Duplicated column | `Fwd Header Length` appears twice | Removed |
 | Identical feature pairs | 8 pairs, for example `Total Fwd Packets == Subflow Fwd Packets` | The 69 features hold only 61 distinct measurements |

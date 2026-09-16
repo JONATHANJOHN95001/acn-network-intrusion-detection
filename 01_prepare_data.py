@@ -100,6 +100,10 @@ def main():
     ap.add_argument("--data-dir", help="folder holding the eight CSVs (searched first)")
     ap.add_argument("--check", action="store_true",
                     help="only report which file was found for each day")
+    ap.add_argument("--keep-duplicates", action="store_true",
+                    help="skip deduplication and write data/cicids2017_withdups.parquet. "
+                         "Only for measuring how much the duplicates inflate scores; "
+                         "never use this file to train a model you intend to trust.")
     a = ap.parse_args()
 
     paths = find_csvs(a.data_dir)
@@ -169,11 +173,14 @@ def main():
     log("\n[4] Exact duplicate rows (dropped: they leak across the split)")
     dup_mask = data.duplicated()
     n_dup = int(dup_mask.sum())
+    if a.keep_duplicates:
+        log(f"    {n_dup:,} found, KEPT (--keep-duplicates)")
     log(f"    {n_dup:,} of {raw_rows:,}  ({n_dup/raw_rows*100:.2f}%)")
     dup_by_label = data.loc[dup_mask, "Label"].value_counts()
     for lab, n in dup_by_label.items():
         log(f"       {lab:<32} {n:>9,}")
-    data = data[~dup_mask].reset_index(drop=True)
+    if not a.keep_duplicates:
+        data = data[~dup_mask].reset_index(drop=True)
 
     log("\n[5] Final class distribution")
     log(f"    {'label':<32} {'rows':>10} {'share':>9}")
@@ -184,14 +191,18 @@ def main():
     log(f"\n    classes: {len(vc)}   imbalance ratio: {vc.max()/vc.min():,.0f} : 1")
 
     log("\n[6] Writing Parquet")
-    OUT_PARQUET.parent.mkdir(exist_ok=True)
-    data.to_parquet(OUT_PARQUET, index=False, compression="snappy")
-    mb = OUT_PARQUET.stat().st_size / 1e6
+    out_parquet = (OUT_PARQUET.with_name("cicids2017_withdups.parquet")
+                   if a.keep_duplicates else OUT_PARQUET)
+    out_parquet.parent.mkdir(exist_ok=True)
+    data.to_parquet(out_parquet, index=False, compression="snappy")
+    mb = out_parquet.stat().st_size / 1e6
     csv_mb = sum(p.stat().st_size for p in paths.values()) / 1e6
-    log(f"    {OUT_PARQUET.name}: {mb:,.0f} MB  (from {csv_mb:,.0f} MB of CSV)")
+    log(f"    {out_parquet.name}: {mb:,.0f} MB  (from {csv_mb:,.0f} MB of CSV)")
     log(f"    shape: {data.shape[0]:,} rows x {len(feature_cols)} features + Label + Day")
     log(f"\nDone in {time.time()-t0:.0f}s")
 
+    if a.keep_duplicates:
+        return          # keep the real audit report intact
     OUT_REPORT.parent.mkdir(exist_ok=True)
     OUT_REPORT.write_text("\n".join(log_lines), encoding="utf-8")
 

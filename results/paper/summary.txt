@@ -1,0 +1,48 @@
+A. SHORTCUT FEATURES
+
+Macro F1 by feature set (400k sample, 60/40 split):
+
+feature_set    all 69 features  no destination port  no TCP window size  no shortcut features
+model                                                                                        
+decision_tree           0.8851               0.8629              0.8610                0.8434
+random_forest           0.8697               0.8515              0.8484                0.8460
+xgboost                 0.8752               0.8484              0.8420                0.8373
+logistic                0.6260               0.6188              0.6241                0.6056
+
+Change when the shortcut features are removed:
+
+model
+decision_tree   -0.0417
+random_forest   -0.0237
+xgboost         -0.0379
+logistic        -0.0204
+
+Accuracy by feature set:
+
+feature_set    all 69 features  no destination port  no TCP window size  no shortcut features
+model                                                                                        
+decision_tree           0.9979               0.9980              0.9970                0.9966
+random_forest           0.9980               0.9978              0.9972                0.9970
+xgboost                 0.9984               0.9980              0.9978                0.9970
+logistic                0.9747               0.9701              0.9745                0.9700
+
+
+B. DUPLICATE ROWS
+
+Same pipeline, duplicates kept versus removed:
+
+condition      duplicates removed  duplicates kept  inflation
+model                                                        
+decision_tree              0.8851           0.8510    -0.0341
+random_forest              0.8697           0.8678    -0.0019
+xgboost                    0.8752           0.8686    -0.0066
+logistic                   0.6260           0.6040    -0.0220
+
+Accuracy:
+
+condition      duplicates removed  duplicates kept
+model                                             
+decision_tree              0.9979           0.9978
+random_forest              0.9980           0.9980
+xgboost                    0.9984           0.9985
+logistic                   0.9747           0.9715
