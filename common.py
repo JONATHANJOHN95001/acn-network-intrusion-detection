@@ -44,3 +44,22 @@ def load_sample(n, floor=50, seed=0):
         start = end
     df = pd.concat(parts, ignore_index=True)
     return df.sample(frac=1, random_state=seed).reset_index(drop=True)
+
+
+def pick_grid_protocol(results_csv):
+    """Results may hold runs from more than one protocol (the full dataset and a
+    sample). Return (rows, label) for whichever is most complete, preferring the
+    full dataset on a tie, so every output describes the same set of runs."""
+    import pandas as pd
+
+    if not results_csv.exists():
+        return None, ""
+    df = pd.read_csv(results_csv)
+    best, best_n, label = None, 0, ""
+    for key, g in df.groupby(df["sample"].astype(str)):
+        if len(g) > best_n or (len(g) == best_n and key == "full"):
+            best, best_n, label = g, len(g), key
+    if best is None:
+        return None, ""
+    return best, ("Full dataset" if label == "full"
+                  else f"{int(label):,}-flow stratified sample")

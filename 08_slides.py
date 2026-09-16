@@ -135,11 +135,12 @@ def big_picture(slide, name, left=3.3, top=1.35, width=9.4):
 
 
 def grid_top():
-    f = RES / "results.csv"
-    if not f.exists():
+    from common import pick_grid_protocol
+
+    d, _ = pick_grid_protocol(RES / "results.csv")
+    if d is None:
         return None
-    d = pd.read_csv(f)
-    d = d[(d["sample"].astype(str) == "full") & (d["split"] == "60/40")]
+    d = d[d["split"] == "60/40"]
     return d.sort_values("macro_f1", ascending=False) if len(d) else None
 
 

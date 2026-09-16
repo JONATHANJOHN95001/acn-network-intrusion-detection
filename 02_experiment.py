@@ -57,8 +57,10 @@ PARQUET = HERE / "data" / "cicids2017.parquet"
 RESULTS = HERE / "results"
 SEED = 0
 
-# Leave a few cores free so the machine stays usable during long runs.
-N_JOBS = max(1, (os.cpu_count() or 2) - 4)
+# Use at most half the cores. Saturating every core for hours, together with
+# heavy memory use, destabilised this machine (video memory manager bugcheck),
+# so headroom here is a stability requirement, not a nicety.
+N_JOBS = max(1, (os.cpu_count() or 2) // 2 - 2)
 
 
 def _xgb():
@@ -94,9 +96,12 @@ MODELS = {
         make=lambda: LinearDiscriminantAnalysis()),
     "qda": dict(
         scale=True, heavy=False,
-        # eigen solver with shrinkage: Heartbleed has only 7 training rows, fewer
-        # than the 69 features, so its plain covariance matrix is singular.
-        make=lambda: QuadraticDiscriminantAnalysis(solver="eigen", shrinkage="auto")),
+        # Fixed shrinkage, not "auto": the data holds 8 pairs of identical
+        # features, so a class covariance is exactly singular and Ledoit-Wolf
+        # picks too little shrinkage. The eigen solver also avoids svd's
+        # "samples must exceed features" check, which Heartbleed (7 training
+        # rows, 69 features) fails.
+        make=lambda: QuadraticDiscriminantAnalysis(solver="eigen", shrinkage=0.5)),
     "sgd": dict(
         scale=True, heavy=False,
         make=lambda: SGDClassifier(loss="hinge", penalty="l2", alpha=1e-4,
@@ -124,7 +129,8 @@ MODELS = {
                                    early_stopping=True, random_state=42)),
     "linear_svm": dict(
         scale=True, heavy=False,
-        make=lambda: LinearSVC(dual="auto", random_state=SEED)),
+        # bounded: on the full dataset the default never converged and hung the grid
+        make=lambda: LinearSVC(dual="auto", max_iter=2000, random_state=SEED)),
     "logistic": dict(
         scale=True, heavy=False,
         make=lambda: LogisticRegression(max_iter=1000, random_state=SEED)),
@@ -140,6 +146,33 @@ MODELS = {
 def split_tag(test_size):
     train = round((1 - test_size) * 100)
     return f"{train}/{round(test_size * 100)}", f"{train}_{round(test_size * 100)}"
+
+
+def memory_guard(min_free_gb=3.0):
+    """Refuse to start when free RAM is already low. Running heavy jobs on top of
+    a nearly full machine crashed it (shared-memory iGPU + no headroom)."""
+    try:
+        import ctypes
+
+        class S(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+        st = S(); st.dwLength = ctypes.sizeof(S)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
+        free = st.ullAvailPhys / 2**30
+    except Exception:
+        return None
+    print(f"  free RAM: {free:.1f} GB")
+    if free < min_free_gb:
+        raise SystemExit(f"Only {free:.1f} GB RAM free; need {min_free_gb} GB. "
+                         "Close some programs (a browser is usually the big one) and retry.")
+    return free
 
 
 def load(sample=None, floor=50):
@@ -243,6 +276,7 @@ def main():
         raise SystemExit(f"unknown model(s): {bad}")
 
     splits = [float(s) for s in a.splits.split(",")]
+    memory_guard()
     X, y = load(a.sample)
     le = LabelEncoder()
     y_enc = le.fit_transform(y)

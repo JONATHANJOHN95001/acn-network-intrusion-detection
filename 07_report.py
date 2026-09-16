@@ -136,12 +136,19 @@ def audit_numbers():
 
 
 def grid_df(split="60/40"):
-    f = RES / "results.csv"
-    if not f.exists():
+    from common import pick_grid_protocol
+
+    d, _ = pick_grid_protocol(RES / "results.csv")
+    if d is None:
         return None
-    d = pd.read_csv(f)
-    d = d[(d["sample"].astype(str) == "full") & (d["split"] == split)]
+    d = d[d["split"] == split]
     return d.sort_values("macro_f1", ascending=False) if len(d) else None
+
+
+def grid_label():
+    from common import pick_grid_protocol
+
+    return pick_grid_protocol(RES / "results.csv")[1] or "the grid"
 
 
 # ------------------------------------------------------------------ document
@@ -270,7 +277,7 @@ def build():
     if d is not None:
         best = d.iloc[0]
         para(doc,
-             f"On the full dataset at a 60/40 split, {MODEL_NAMES.get(best['model'], best['model'])} "
+             f"On {grid_label().lower()} at a 60/40 split, {MODEL_NAMES.get(best['model'], best['model'])} "
              f"scored the highest macro F1 ({best['macro_f1']:.3f}), at {best['accuracy']:.3f} "
              "accuracy. Figure 3 shows the gap between accuracy and macro F1 for every model: "
              "accuracy is above 0.9 for most, while macro F1 spreads much wider, which is the "
@@ -282,7 +289,7 @@ def build():
                                                d["weighted_f1"], d["flows_per_sec"])]
         table(doc, ["Model", "Accuracy", "Macro F1", "Weighted F1", "Flows/s"], rows,
               widths=[1.9, 1.0, 1.0, 1.1, 1.1])
-        para(doc, "Table 1. Every classifier on the full dataset, sorted by macro F1.",
+        para(doc, f"Table 1. Every classifier on {grid_label().lower()}, sorted by macro F1.",
              italic=True, size=9)
         figure(doc, "04_per_class_f1", "Figure 4. F1 per model and class; the rare attacks on "
                "the right are where models differ.")

@@ -44,7 +44,7 @@ warnings.filterwarnings("ignore")
 HERE = Path(__file__).parent
 OUT = HERE / "results" / "imbalance"
 SEED = 0
-N_JOBS = max(1, (os.cpu_count() or 2) - 4)
+N_JOBS = max(1, (os.cpu_count() or 2) // 2 - 2)   # leave real headroom
 BENIGN_KEEP = 200_000
 SMOTE_TO = 5_000
 STRATEGIES = ["none", "class_weight", "undersample", "smote", "under+smote"]

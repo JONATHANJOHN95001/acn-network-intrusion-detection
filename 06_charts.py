@@ -61,13 +61,22 @@ def label_at_tip(ax, text, v, y, dx=4, **kw):
                 ha="left" if dx >= 0 else "right", va="center", fontsize=8, color=ps.INK2, **kw)
 
 
+def grid_protocol():
+    from common import pick_grid_protocol
+
+    return pick_grid_protocol(RES / "results.csv")
+
+
 def full_grid(split="60/40"):
-    f = RES / "results.csv"
-    if not f.exists():
+    df, _ = grid_protocol()
+    if df is None:
         return None
-    df = pd.read_csv(f)
-    df = df[(df["sample"].astype(str) == "full") & (df["split"] == split)]
+    df = df[df["split"] == split]
     return df if len(df) else None
+
+
+def grid_label():
+    return grid_protocol()[1] or "grid"
 
 
 def class_counts():
@@ -223,7 +232,7 @@ def chart_test_size():
     n = len(piv)
     fig, ax = plt.subplots(figsize=(W, 0.3 * n + 1.6))
     top = ps.titles(fig, "Test size changes little",
-                    "Macro F1 on the full dataset at each test size. Most models barely move "
+                    f"Macro F1 ({grid_label().lower()}) at each test size. Most models barely move "
                     "between\n20%, 40% and 60% of the data held out for testing.")
     fig.subplots_adjust(left=0.27, right=0.97, top=top - 0.04, bottom=0.08)
     ax.set_ylim(n - 0.5, -0.5)
@@ -395,8 +404,14 @@ def chart_feature_importance():
 
 
 def _imbalance():
-    f = RES / "imbalance" / "imbalance.csv"
-    return pd.read_csv(f) if f.exists() else None
+    d = RES / "imbalance"
+    f = d / "imbalance.csv"
+    if not f.exists():                      # fall back to the sample run
+        cands = sorted(d.glob("imbalance_s*.csv"), key=lambda p: p.stat().st_size)
+        if not cands:
+            return None
+        f = cands[-1]
+    return pd.read_csv(f)
 
 
 def chart_imbalance():

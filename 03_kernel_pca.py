@@ -26,6 +26,7 @@ Usage:
 """
 
 import argparse
+import os
 import time
 import warnings
 from pathlib import Path
@@ -53,6 +54,10 @@ HERE = Path(__file__).parent
 RESULTS = HERE / "results" / "kernel_pca"
 SEED = 0
 
+# Half the cores at most: saturating all of them for hours destabilised
+# this machine (video memory manager bugcheck).
+N_JOBS = max(1, (os.cpu_count() or 2) // 2 - 2)
+
 KERNELS = ["linear", "poly", "rbf", "sigmoid", "cosine"]
 GAMMA_KERNELS = ("poly", "rbf", "sigmoid")   # linear and cosine have no gamma
 
@@ -63,9 +68,9 @@ CLASSIFIERS = {
     "sgd": ("SGD", lambda: SGDClassifier(random_state=SEED)),
     "dt":  ("DT",  lambda: DecisionTreeClassifier(criterion="entropy", random_state=SEED)),
     "rf":  ("RF",  lambda: RandomForestClassifier(n_estimators=200, criterion="entropy",
-                                                  n_jobs=-1, random_state=SEED)),
+                                                  n_jobs=N_JOBS, random_state=SEED)),
     "nb":  ("NB",  lambda: GaussianNB()),
-    "knn": ("KNN", lambda: KNeighborsClassifier(n_neighbors=5, n_jobs=-1)),
+    "knn": ("KNN", lambda: KNeighborsClassifier(n_neighbors=5, n_jobs=N_JOBS)),
     "svm": ("SVM", lambda: SVC(kernel="rbf", random_state=SEED)),
 }
 
@@ -87,7 +92,7 @@ def reduce(kernel, n_comp, gamma, Xtr, Xte):
         # positive semi-definite) it picks large negative ones and fails.
         steps.append(("kpca", KernelPCA(n_components=n_comp, kernel=kernel, gamma=gamma,
                                         eigen_solver="arpack", random_state=SEED,
-                                        n_jobs=-1)))
+                                        n_jobs=N_JOBS)))
     pre = Pipeline(steps)
     return pre.fit_transform(Xtr), pre.transform(Xte)
 

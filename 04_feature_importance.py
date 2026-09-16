@@ -37,7 +37,7 @@ warnings.filterwarnings("ignore")
 HERE = Path(__file__).parent
 OUT = HERE / "results" / "features"
 SEED = 0
-N_JOBS = max(1, (os.cpu_count() or 2) - 4)
+N_JOBS = max(1, (os.cpu_count() or 2) // 2 - 2)   # leave real headroom
 BENIGN = "BENIGN"
 
 
