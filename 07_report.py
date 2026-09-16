@@ -277,7 +277,7 @@ def build():
     if d is not None:
         best = d.iloc[0]
         para(doc,
-             f"On {grid_label().lower()} at a 60/40 split, {MODEL_NAMES.get(best['model'], best['model'])} "
+             f"On the {grid_label().lower()} at a 60/40 split, {MODEL_NAMES.get(best['model'], best['model'])} "
              f"scored the highest macro F1 ({best['macro_f1']:.3f}), at {best['accuracy']:.3f} "
              "accuracy. Figure 3 shows the gap between accuracy and macro F1 for every model: "
              "accuracy is above 0.9 for most, while macro F1 spreads much wider, which is the "
@@ -289,7 +289,7 @@ def build():
                                                d["weighted_f1"], d["flows_per_sec"])]
         table(doc, ["Model", "Accuracy", "Macro F1", "Weighted F1", "Flows/s"], rows,
               widths=[1.9, 1.0, 1.0, 1.1, 1.1])
-        para(doc, f"Table 1. Every classifier on {grid_label().lower()}, sorted by macro F1.",
+        para(doc, f"Table 1. Every classifier on the {grid_label().lower()}, sorted by macro F1.",
              italic=True, size=9)
         figure(doc, "04_per_class_f1", "Figure 4. F1 per model and class; the rare attacks on "
                "the right are where models differ.")

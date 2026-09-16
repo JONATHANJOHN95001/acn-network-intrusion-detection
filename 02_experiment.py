@@ -60,7 +60,7 @@ SEED = 0
 # Use at most half the cores. Saturating every core for hours, together with
 # heavy memory use, destabilised this machine (video memory manager bugcheck),
 # so headroom here is a stability requirement, not a nicety.
-N_JOBS = max(1, (os.cpu_count() or 2) // 2 - 2)
+N_JOBS = max(1, (os.cpu_count() or 2) // 2)
 
 
 def _xgb():
@@ -268,7 +268,12 @@ def main():
         return
 
     if a.all:
-        names = [n for n, v in MODELS.items() if not v["heavy"]]
+        # adaboost and linear_svm are excluded from the sweep on measured cost:
+        # adaboost scored macro F1 0.165, and linear_svm needed 42.7 min for a
+        # split to reach 0.579, which logistic regression nearly matches in 79 s.
+        # Both stay available with --models.
+        skip = {"adaboost", "linear_svm"}
+        names = [n for n, v in MODELS.items() if not v["heavy"] and n not in skip]
     else:
         names = [m.strip() for m in a.models.split(",") if m.strip()]
     bad = [n for n in names if n not in MODELS]

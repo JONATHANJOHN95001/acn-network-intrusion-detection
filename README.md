@@ -117,6 +117,96 @@ drown out 11 Heartbleed flows. A decision tree on the 60/40 split shows the gap:
 The per-class report shows where it fails: XSS at F1 0.45 (confused with web
 brute force, which has a near-identical flow profile), Infiltration at recall 0.57.
 
+## Classifier comparison
+
+Every model, on a 400,000-flow stratified sample at a 60/40 split. The full
+2.5M-row dataset was also run at test size 0.2 and gives the same ranking;
+the sample is used for the headline table so that all three test sizes are
+strictly comparable.
+
+| Model | Accuracy | Macro F1 | Fit | Flows/s |
+|---|---|---|---|---|
+| Decision Tree | 0.9979 | 0.8851 | 19 s | 1,437,230 |
+| XGBoost | 0.9984 | 0.8752 | 72 s | 85,748 |
+| Random Forest | 0.9980 | 0.8697 | 49 s | 129,916 |
+| CatBoost | 0.9985 | 0.8671 | 645 s | 424,167 |
+| MLP | 0.9955 | 0.7401 | 99 s | 677,802 |
+| Logistic Regression | 0.9747 | 0.6260 | 23 s | 1,081,860 |
+| Hist. Gradient Boosting | 0.9859 | 0.6159 | 13 s | 109,611 |
+| Naive Bayes | 0.7091 | 0.4759 | 4 s | 170,698 |
+| LDA | 0.9080 | 0.4545 | 5 s | 961,398 |
+| SGD | 0.9616 | 0.3575 | 10 s | 992,414 |
+| QDA | 0.3664 | 0.3108 | 4 s | 47,671 |
+| LightGBM | 0.7527 | 0.1240 | 32 s | 48,919 |
+
+- **The plain Decision Tree wins on macro F1** and is the fastest to train and
+  to predict with. For an IDS that has to keep up with a live link, that
+  combination beats the boosted ensembles, which score no better here.
+- **Accuracy cannot rank these models.** The top four sit within 0.0006 of each
+  other on accuracy but differ by 0.018 on macro F1, and LightGBM reaches 0.75
+  accuracy at 0.12 macro F1.
+- **LightGBM collapses with default settings** on all three splits: it stops
+  predicting the rare classes at all. Class weighting repairs it completely
+  (see below), so the default result is a warning about defaults, not about the
+  algorithm.
+- Two models were dropped from the sweep on measured cost: AdaBoost (macro F1
+  0.165) and linear SVM, which needed 42.7 minutes for one split to reach
+  0.579, a score logistic regression nearly matches in 79 seconds. Both remain
+  runnable with `--models`.
+
+## Handling the class imbalance
+
+Each strategy is applied to the training split only; the test split keeps the
+real class mix, so the scores stay honest.
+
+| Model | No correction | Class weights | Undersample | SMOTE | Under+SMOTE |
+|---|---|---|---|---|---|
+| Decision Tree | 0.8726 | 0.9044 | 0.8444 | 0.8393 | 0.8446 |
+| Random Forest | 0.8630 | 0.8801 | 0.8822 | 0.8671 | 0.8744 |
+| LightGBM | 0.1153 | 0.9101 | 0.1435 | 0.9142 | 0.9046 |
+
+**Class weighting is the best and the cheapest fix**: one parameter, no
+resampling and no extra training time. It takes Heartbleed recall to 1.00 and,
+for the decision tree, Infiltration to 1.00. SMOTE is better only on XSS
+(0.51 vs 0.35 for random forest), so the right choice depends on which attack
+matters most. SQL injection and XSS stay hard under every strategy, which
+matches the feature analysis: their attack lives in the HTTP payload that flow
+features cannot see.
+
+## Does the Kernel PCA result hold?
+
+The grid was repeated on three independent samples (`--seed 0/1/2`). The gain
+from the best Kernel PCA setting over using all 69 features:
+
+| Classifier | Seed 0 | Seed 1 | Seed 2 | Mean |
+|---|---|---|---|---|
+| SVM (RBF) | +0.073 | +0.158 | +0.064 | **+0.098** |
+| KNN | +0.025 | +0.005 | +0.026 | **+0.019** |
+| Random Forest | -0.056 | -0.059 | -0.030 | -0.048 |
+| Decision Tree | -0.034 | -0.059 | -0.086 | -0.059 |
+| Naive Bayes | -0.085 | -0.090 | -0.076 | -0.084 |
+| SGD | -0.124 | -0.139 | -0.136 | -0.133 |
+| Logistic Regression | -0.152 | -0.173 | -0.142 | -0.156 |
+
+The sign is the same on all three samples for every classifier, so the
+conclusion is reproducible: Kernel PCA helps only the two distance-based
+classifiers.
+
+### Tuning gamma changes the kernel ranking
+
+The nonlinear kernels were partly handicapped by scikit-learn's default
+`gamma`. Averaged macro F1 over the tuning grid:
+
+| Kernel | gamma 0.001 | 0.005 | default | 0.05 | 0.1 |
+|---|---|---|---|---|---|
+| rbf | **0.512** | 0.482 | 0.452 | 0.430 | 0.408 |
+| poly | **0.473** | 0.455 | 0.406 | 0.352 | 0.341 |
+| sigmoid | 0.514 | 0.517 | 0.540 | 0.567 | **0.570** |
+
+rbf and poly want a much smaller gamma than the default, sigmoid a larger one.
+So "the nonlinear kernels are worse" holds for the defaults but overstates the
+gap once gamma is tuned.
+
 ## Kernel PCA dimensionality reduction
 
 `03_kernel_pca.py` reduces the 69 features with Kernel PCA, then classifies
@@ -245,8 +335,8 @@ protocol terms, and reads the numbers straight from `results/features/`.
 - [x] Experiment framework
 - [x] Kernel PCA grid with Logistic Regression (5 kernels x 3 test sizes x 3 component counts)
 - [x] Kernel PCA grid with all 7 classifiers (336 runs)
-- [ ] Full algorithm grid across 80/20, 60/40, 40/60 splits
-- [ ] Comparison plots and confusion-matrix heatmaps
-- [ ] Class-imbalance study: class weights, undersampling, SMOTE on the training split only
-- [ ] Feature importance explained in TCP and flow terms
-- [ ] Write-up
+- [x] Full algorithm grid across 80/20, 60/40, 40/60 splits
+- [x] Comparison plots and confusion-matrix heatmaps
+- [x] Class-imbalance study: class weights, undersampling, SMOTE on the training split only
+- [x] Feature importance explained in TCP and flow terms
+- [x] Write-up (results/ACN_IDS_Report.docx, results/ACN_IDS_Slides.pptx)

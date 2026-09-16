@@ -146,7 +146,7 @@ def chart_accuracy_vs_macro_f1():
     n = len(df)
     fig, ax = plt.subplots(figsize=(W, 0.3 * n + 1.6))
     top = ps.titles(fig, "Accuracy hides the rare attacks",
-                    "Full dataset, 60/40 split. Accuracy is above 0.9 for most models; macro F1 "
+                    f"{grid_label()}, 60/40 split. Accuracy is above 0.9 for most models; macro F1 "
                     "averages\nall 15 classes equally, so missed rare attacks pull it down.")
     fig.subplots_adjust(left=0.27, right=0.97, top=top - 0.04, bottom=0.08)
     ax.set_xlim(0, 1.02)
@@ -208,7 +208,7 @@ def chart_per_class_f1():
     M = df[[f"f1::{c}" for c in cols]].to_numpy(dtype=float)
     fig, ax = plt.subplots(figsize=(W, 0.3 * len(df) + 2.6))
     top = ps.titles(fig, "F1 score per model and class",
-                    "Full dataset, 60/40 split. Classes run from most to fewest flows, left to "
+                    f"{grid_label()}, 60/40 split. Classes run from most to fewest flows, left to "
                     "right; the rare\nattacks on the right are where models differ.")
     fig.subplots_adjust(left=0.24, right=0.93, top=top, bottom=0.2)
     mesh = _heatmap(ax, M, [MODEL_NAMES.get(m, m) for m in df["model"]],
@@ -219,14 +219,13 @@ def chart_per_class_f1():
 
 
 def chart_test_size():
-    f = RES / "results.csv"
-    if not f.exists():
-        return None
-    df = pd.read_csv(f)
-    df = df[df["sample"].astype(str) == "full"]
-    if df["split"].nunique() < 2:
+    df, _ = grid_protocol()
+    if df is None or df["split"].nunique() < 2:
         return None
     piv = df.pivot_table(index="model", columns="test_size", values="macro_f1")
+    piv = piv.dropna()          # only models measured at every test size
+    if piv.empty:
+        return None
     piv = piv.loc[piv.mean(axis=1).sort_values(ascending=False).index]
     tests = list(piv.columns)
     n = len(piv)
@@ -453,11 +452,11 @@ def chart_imbalance_rare_recall():
     d["row"] = [f"{MODEL_NAMES.get(m, m)}  /  {STRATEGY_NAMES.get(s, s)}"
                 for m, s in zip(d["model"], d["strategy"])]
     M = d[[f"recall::{c}" for c in rare]].to_numpy(dtype=float)
-    fig, ax = plt.subplots(figsize=(W, 0.27 * len(d) + 1.9))
+    fig, ax = plt.subplots(figsize=(W, 0.27 * len(d) + 2.5))
     top = ps.titles(fig, "Recall on the six rarest attacks",
                     "Share of each rare attack that was detected, per model and imbalance "
                     "strategy.")
-    fig.subplots_adjust(left=0.38, right=0.92, top=top - 0.02, bottom=0.05)
+    fig.subplots_adjust(left=0.38, right=0.92, top=top - 0.10, bottom=0.04)
     mesh = _heatmap(ax, M, d["row"], [short(c) for c in rare], fontsize=7.2)
     ax.xaxis.tick_top()
     plt.setp(ax.get_xticklabels(), rotation=25, ha="left", rotation_mode="anchor")
