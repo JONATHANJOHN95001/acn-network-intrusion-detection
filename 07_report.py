@@ -84,9 +84,13 @@ def bullet(doc, text, bold_lead=None):
     return p
 
 
+PLACED = []
+
+
 def figure(doc, name, caption):
     path = CHARTS / f"{name}.png"
     if path.exists():
+        PLACED.append(name)
         doc.add_picture(str(path), width=Inches(6.3))
         doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
         c = doc.add_paragraph()
@@ -188,13 +192,16 @@ def build():
          f"the data holds {a['total']} network flows across {a['classes']} classes, one benign "
          f"and fourteen attacks, with a {a['ratio']} to 1 size gap between the largest and "
          "smallest class. We show that accuracy is a misleading measure on such imbalanced "
-         "data and report macro-averaged F1 throughout. Tree ensembles, led by Random Forest, "
-         "detect most attacks well; linear models and the rarest attacks are where performance "
-         "falls. We apply Kernel PCA across five kernels, three component counts and three "
+         "data and report macro-averaged F1 throughout. A plain decision tree gives the best "
+         "macro F1 and is also the cheapest to train and the fastest to predict with, "
+         "matching the boosted ensembles; linear models and the rarest attacks are where "
+         "performance falls. We apply Kernel PCA across five kernels, three component counts and three "
          "train/test splits, and find that reducing the 69 features helps only the "
          "distance-based classifiers (KNN and SVM). We tie the most useful flow features back "
          "to the protocol behaviour of each attack, and address the class imbalance with class "
-         "weighting and resampling.")
+         "weighting and resampling. Finally we test two assumptions commonly made about this "
+         "dataset, that duplicate rows inflate the scores and that the models lean on a few "
+         "giveaway features, and find that neither holds here.")
 
     # 1. introduction
     h(doc, "1  Introduction", 1)
@@ -337,10 +344,10 @@ def build():
         para(doc,
              "Permutation importance (shuffle one feature, measure the drop in macro F1) shows "
              "the Random Forest leans most on Destination Port and the initial TCP window sizes. "
-             "These are partly shortcuts: the port identifies the service, and the initial window "
-             "fingerprints the operating system that sent the traffic, so the very high scores on "
-             "this dataset would not fully transfer to a different network. Figure 10 lists the "
-             "top features.")
+             "Both look like shortcuts: the port identifies the service rather than the attack, "
+             "and the initial window is chosen by the sending machine's TCP stack, so in a small "
+             "testbed it partly identifies which machine sent the traffic. Section 9 tests how "
+             "much the models actually depend on them. Figure 10 lists the top features.")
         figure(doc, "10_feature_importance",
                "Figure 10. Most important features by permutation importance.")
     if sig.exists():
@@ -370,6 +377,10 @@ def build():
     # 8. imbalance
     h(doc, "8  Handling the class imbalance", 1)
     imb = RES / "imbalance" / "imbalance.csv"
+    if not imb.exists():                      # the sample run writes imbalance_s<N>.csv
+        found = sorted((RES / "imbalance").glob("imbalance_s*.csv"),
+                       key=lambda f: f.stat().st_size)
+        imb = found[-1] if found else imb
     if imb.exists():
         para(doc,
              "We tried three ways to help the rare classes, each applied to the training split "
@@ -384,7 +395,49 @@ def build():
         para(doc, "[Imbalance results missing; run 05_imbalance.py.]", italic=True)
 
     # 9. deployment + conclusion
-    h(doc, "9  Deployment considerations", 1)
+    h(doc, "9  Testing two common assumptions", 1)
+    para(doc,
+         "Two claims are often repeated about CIC-IDS2017: that the duplicate rows inflate "
+         "published scores, and that models lean on a few giveaway features. Both are plausible, "
+         "and both are easy to assume rather than check. We measured them.")
+    h(doc, "9.1  Do the duplicate rows inflate the score?", 2)
+    para(doc,
+         "We kept the duplicates, split at random as published work usually does, then found "
+         "which test rows appear verbatim in the training split and scored those rows separately "
+         "from the genuinely unseen ones (10_leakage.py).")
+    table(doc, ["Model", "Test rows also in training", "Accuracy on those rows",
+                "Accuracy on unseen rows", "Gap"],
+          [("Decision Tree", "13.2%", "0.9994", "0.9983", "+0.0011"),
+           ("Random Forest", "13.2%", "0.9998", "0.9984", "+0.0014")],
+          widths=[1.3, 1.5, 1.4, 1.3, 0.8])
+    para(doc, "Table 3. Leakage measured directly on the full dataset at a 60/40 split.",
+         italic=True, size=9)
+    para(doc,
+         "The inflation is negligible, about +0.0002 on the reported accuracy. Even with 13.2% "
+         "of the test set memorisable, accuracy on unseen rows is already 0.998, so memorisation "
+         "has no headroom to add anything. Removing the duplicates is still the right thing to "
+         "do, because they are concentrated in a few classes and distort the balance (macro F1 "
+         "is 0.867 with them kept against 0.896 without), but not for the reason usually given.")
+    h(doc, "9.2  How much do the models depend on the shortcut features?", 2)
+    para(doc,
+         "We retrained without Destination Port and both initial TCP window features "
+         "(09_paper_experiments.py).")
+    table(doc, ["Model", "All 69 features", "No shortcut features", "Change"],
+          [("Decision Tree", "0.8851", "0.8434", "-0.042"),
+           ("XGBoost", "0.8752", "0.8373", "-0.038"),
+           ("Random Forest", "0.8697", "0.8460", "-0.024"),
+           ("Logistic Regression", "0.6260", "0.6056", "-0.020")],
+          widths=[1.8, 1.4, 1.6, 1.0])
+    para(doc, "Table 4. Macro F1 with and without the shortcut features.", italic=True, size=9)
+    para(doc,
+         "The models lose only two to four points of macro F1, so the results are not an "
+         "artefact of those features. The more useful lesson concerns importance scores "
+         "themselves: the feature ranked most important can be removed at almost no cost, "
+         "because the dataset holds 28 highly correlated feature pairs, eight of them identical, "
+         "and the signal simply travels another route. An importance ranking on redundant "
+         "features says which feature the model happened to use, not which information it needs.")
+
+    h(doc, "10  Deployment considerations", 1)
     para(doc,
          "A flow-based IDS sits beside the traffic, not in its path: a flow's statistics are "
          "complete only when the flow ends, so detection comes after the fact and the delay "
@@ -394,26 +447,25 @@ def build():
          "features survive encryption, which suits DoS, scans and brute force, but payload "
          "attacks such as SQL injection need application logs as well.")
 
-    h(doc, "10  Conclusion", 1)
+    h(doc, "11  Conclusion", 1)
     para(doc,
-         "On CIC-IDS2017, tree ensembles led by Random Forest detect most attacks well, but the "
+         "On CIC-IDS2017 a plain decision tree detects most attacks as well as any boosted "
+         "ensemble, at a fraction of the training cost, but the "
          "rarest attacks and the two look-alike web attacks remain hard, and the headline "
          "accuracy overstates performance until macro F1 and the per-class scores are read "
          "alongside it. Kernel PCA helps only the distance-based classifiers. The most useful "
          "features are partly dataset-specific shortcuts, so the natural next steps are to test "
          "on traffic from a different network and to drop those shortcut features. Removing the "
          "duplicate rows and reporting macro F1 were the two changes that most affected how the "
-         "results should be read.")
+         "results should be read. Testing our own assumptions mattered too: neither the "
+         "duplicate rows nor the shortcut features turned out to explain the high scores, "
+         "and reporting that is more useful than repeating the claim.")
 
     OUT.parent.mkdir(exist_ok=True)
     doc.save(OUT)
     print(f"wrote {OUT}")
-    have = sum((CHARTS / f"{n}.png").exists() for n in
-               ["01_class_distribution", "02_duplicates_removed", "03_accuracy_vs_macro_f1",
-                "04_per_class_f1", "05_test_size", "06_throughput", "07_kpca_kernel_by_classifier",
-                "08_kpca_best_vs_no_reduction", "09_kpca_components", "10_feature_importance",
-                "11_imbalance_macro_f1", "12_imbalance_rare_recall"])
-    print(f"figures embedded: {have} of 12  (missing ones show a placeholder)")
+    have = len(PLACED)
+    print(f"figures embedded: {have} of 12  (any missing show a placeholder)")
 
 
 if __name__ == "__main__":

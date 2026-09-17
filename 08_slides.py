@@ -166,7 +166,7 @@ def build():
     s = content(prs, "The dataset, after cleaning")
     bullets(s, [
         ("2,574,059 flows, ", "69 features, 15 classes (CIC-IDS2017, five days of traffic)."),
-        ("Removed 9% duplicate rows ", "that would otherwise leak across the train/test split."),
+        ("Removed 9% duplicate rows ", "that skew the class balance (we measured the leakage: it barely affects accuracy)."),
         ("Dropped 8 dead columns ", "and one duplicated column."),
         ("Rarest attacks: ", "Heartbleed 11 flows, SQL injection 21, Infiltration 36."),
     ], width=6.6)
@@ -228,13 +228,26 @@ def build():
     ], left=0.7, top=1.5, width=5.2)
     picture(s, "12_imbalance_rare_recall", left=6.1, top=1.3, width=6.8)
 
-    # 8 deployment + conclusion
+    # 8 testing our own assumptions
+    s = content(prs, "We tested two common assumptions. Both were wrong.")
+    bullets(s, [
+        ('"Duplicates inflate the scores." ', "13.2% of test rows are memorisable, yet accuracy "
+         "on them is only +0.001 above unseen rows. Inflation: +0.0002."),
+        ('"Models lean on giveaway features." ', "drop Destination Port and both TCP window "
+         "features and macro F1 falls just 0.02 to 0.04. Not an artefact."),
+        ("Why: ", "unseen-row accuracy is already 0.998, so memorisation has no headroom; and "
+         "28 correlated feature pairs mean the signal simply reroutes."),
+        ("The real lesson: ", "importance rankings mislead when features are redundant. "
+         "Dedup still matters, but for class balance, not inflation."),
+    ], width=11.8)
+
+    # 9 deployment + conclusion
     s = content(prs, "Deployment and takeaways")
     bullets(s, [
         ("Runs beside the traffic, ", "not inline: a verdict comes only when the flow ends."),
         ("Speed matters: ", "the classifier must keep up with the link's flow rate."),
         ("Encryption is fine; ", "payload attacks (SQL injection, XSS) need application logs too."),
-        ("Takeaway: ", "tree ensembles win; report macro F1, not accuracy; Kernel PCA is not "
+        ("Takeaway: ", "a plain decision tree is enough; report macro F1, not accuracy; Kernel PCA is not "
          "a free win; the rare and look-alike attacks stay hard."),
     ], width=11.8)
 
