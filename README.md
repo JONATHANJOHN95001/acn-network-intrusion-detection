@@ -121,10 +121,11 @@ brute force, which has a near-identical flow profile), Infiltration at recall 0.
 
 ## Classifier comparison
 
-Every model, on a 400,000-flow stratified sample at a 60/40 split. The full
-2.5M-row dataset was also run at test size 0.2 and gives the same ranking;
-the sample is used for the headline table so that all three test sizes are
-strictly comparable.
+Every model that runs at this scale, on a 400,000-flow stratified sample at a
+60/40 split. KNN and RBF-SVM scale superlinearly and appear in the next table
+instead. The full 2.5M-row dataset was also run at test size 0.2 and gives the
+same ranking; the sample is used for the headline table so that all three test
+sizes are strictly comparable.
 
 | Model | Accuracy | Macro F1 | Fit | Flows/s |
 |---|---|---|---|---|
