@@ -293,3 +293,38 @@ Points that follow from how flows work:
 - Claise, B., Trammell, B. and Aitken, P. (2013). *Specification of the IP Flow
   Information Export (IPFIX) Protocol.* RFC 7011.
 - CVE-2014-0160 (Heartbleed), OpenSSL TLS heartbeat read overrun.
+
+## Appendix: reading the feature names
+
+CICFlowMeter's column names are terse. The pattern is
+`<direction> <quantity> <statistic>`, and knowing the four pieces makes the
+whole set readable.
+
+| Piece | Meaning |
+|---|---|
+| **Fwd** | forward direction: from whoever sent the first packet, normally the client |
+| **Bwd** | backward direction: the reply |
+| **Flow** | both directions together |
+| **IAT** | inter-arrival time, the gap between one packet and the next |
+| **Subflow** | the same counts again, averaged per burst of activity |
+| **Init_Win_bytes** | the TCP receive window each side advertised when the connection opened |
+| **act_data_pkt_fwd** | forward packets that actually carried payload, not just acknowledgements |
+| **min_seg_size_forward** | the smallest TCP segment seen going forward |
+| **Active / Idle** | how long the flow spent sending versus waiting |
+
+So `Bwd IAT Max` is the longest gap between two reply packets, and
+`Fwd Packet Length Std` is how much the sizes of the client's packets varied.
+
+Two conventions that trip people up:
+
+- **Times are microseconds.** A `Flow IAT Mean` of 5,872,501 is 5.9 seconds,
+  not 5.9 million seconds. Durations and all IAT columns use the same unit.
+- **-1 means "not observed"**, most often in `Init_Win_bytes_backward`. A flow
+  with no backward TCP packet, such as a UDP DNS lookup, has no window to
+  report. It is not a measurement of zero.
+
+Some columns say the same thing twice. `Total Fwd Packets` and
+`Subflow Fwd Packets` are identical in every row, as are
+`Fwd Packet Length Mean` and `Avg Fwd Segment Size`, and six other pairs. That
+redundancy matters when reading feature importance: a feature can look
+essential and still be removable, because its twin carries the same signal.
