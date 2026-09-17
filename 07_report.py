@@ -149,6 +149,17 @@ def grid_df(split="60/40"):
     return d.sort_values("macro_f1", ascending=False) if len(d) else None
 
 
+def small_grid():
+    """The like-for-like run at 100k where every classifier fits, including the
+    two that scale superlinearly."""
+    f = RES / "results.csv"
+    if not f.exists():
+        return None
+    d = pd.read_csv(f)
+    d = d[(d["sample"].astype(str) == "100000") & (d["split"] == "60/40")]
+    return d.sort_values("macro_f1", ascending=False) if len(d) else None
+
+
 def grid_label():
     from common import pick_grid_protocol
 
@@ -296,7 +307,8 @@ def build():
                                                d["weighted_f1"], d["flows_per_sec"])]
         table(doc, ["Model", "Accuracy", "Macro F1", "Weighted F1", "Flows/s"], rows,
               widths=[1.9, 1.0, 1.0, 1.1, 1.1])
-        para(doc, f"Table 1. Every classifier on the {grid_label().lower()}, sorted by macro F1.",
+        para(doc, f"Table 1. The classifiers that run at this scale, on the {grid_label().lower()}, "
+             "sorted by macro F1. KNN and SVM scale superlinearly and appear in Table 2 instead.",
              italic=True, size=9)
         figure(doc, "04_per_class_f1", "Figure 4. F1 per model and class; the rare attacks on "
                "the right are where models differ.")
@@ -304,6 +316,34 @@ def build():
                "on a busy link must keep up with the flow rate.")
         figure(doc, "05_test_size", "Figure 6. Macro F1 at each test size; most models barely "
                "move between 20% and 60% held out.")
+
+        sm = small_grid()
+        if sm is not None:
+            h(doc, "5.1  All sixteen classifiers, including the two that scale poorly", 2)
+            para(doc,
+                 "KNN and RBF-SVM cost time that grows faster than linearly with the number of "
+                 "flows, so they cannot be run at the scale of Table 1. To compare every "
+                 "algorithm on equal terms we repeated the 60/40 split on a 100,000-flow sample, "
+                 "where all sixteen fit, and added AdaBoost and linear SVM back in.")
+            rows = [(MODEL_NAMES.get(m, m), f"{a:.4f}", f"{f:.4f}", f"{t:.0f} s", f"{fp:,}")
+                    for m, a, f, t, fp in zip(sm["model"], sm["accuracy"], sm["macro_f1"],
+                                              sm["fit_seconds"], sm["flows_per_sec"])]
+            table(doc, ["Model", "Accuracy", "Macro F1", "Fit", "Flows/s"], rows,
+                  widths=[1.9, 1.0, 1.0, 0.9, 1.2])
+            para(doc, "Table 2. All sixteen classifiers on a 100,000-flow sample, 60/40 split.",
+                 italic=True, size=9)
+            para(doc,
+                 "Two things stand out. KNN is competitive on accuracy, reaching macro F1 0.709, "
+                 "better than several models that train far faster. But KNN and SVM are by a wide "
+                 "margin the slowest to classify: 5,031 and 1,305 flows per second against the "
+                 "decision tree's 1.2 million. For an IDS that has to keep pace with a live link "
+                 "that difference decides the matter, whatever the accuracy. KNN has no real "
+                 "training step at all and pays the entire cost at prediction time, which is the "
+                 "worst shape for this application.")
+            para(doc,
+                 "The ordering among the leaders also shifts with sample size: XGBoost is first "
+                 "here while the decision tree leads in Table 1. The top few models are within a "
+                 "few points of each other, so the exact ranking should not be read as settled.")
     else:
         para(doc, "[The full-dataset classifier grid has not finished yet. Run "
                   "02_experiment.py --all, then 06_charts.py, then rebuild this report.]",

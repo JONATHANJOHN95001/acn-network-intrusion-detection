@@ -148,6 +148,19 @@ def split_tag(test_size):
     return f"{train}/{round(test_size * 100)}", f"{train}_{round(test_size * 100)}"
 
 
+def required_free_gb(sample):
+    """How much free RAM this run actually needs. The full dataset is the heavy
+    case; a small sample needs far less, so a single fixed threshold turned away
+    jobs that were never going to strain the machine."""
+    if sample is None:
+        return 3.0
+    if sample > 500_000:
+        return 2.5
+    if sample > 150_000:
+        return 2.0
+    return 1.5
+
+
 def memory_guard(min_free_gb=3.0):
     """Refuse to start when free RAM is already low. Running heavy jobs on top of
     a nearly full machine crashed it (shared-memory iGPU + no headroom)."""
@@ -170,7 +183,7 @@ def memory_guard(min_free_gb=3.0):
         return None
     print(f"  free RAM: {free:.1f} GB")
     if free < min_free_gb:
-        raise SystemExit(f"Only {free:.1f} GB RAM free; need {min_free_gb} GB. "
+        raise SystemExit(f"Only {free:.1f} GB RAM free; this run needs {min_free_gb} GB. "
                          "Close some programs (a browser is usually the big one) and retry.")
     return free
 
@@ -281,7 +294,7 @@ def main():
         raise SystemExit(f"unknown model(s): {bad}")
 
     splits = [float(s) for s in a.splits.split(",")]
-    memory_guard()
+    memory_guard(required_free_gb(a.sample))
     X, y = load(a.sample)
     le = LabelEncoder()
     y_enc = le.fit_transform(y)

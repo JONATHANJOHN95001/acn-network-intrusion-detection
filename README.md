@@ -156,6 +156,43 @@ strictly comparable.
   0.579, a score logistic regression nearly matches in 79 seconds. Both remain
   runnable with `--models`.
 
+### All sixteen classifiers, including the two that scale poorly
+
+KNN and RBF-SVM cost time that grows faster than linearly with the number of flows,
+so they cannot be run at the scale of the table above. To compare every algorithm on
+equal terms, the 60/40 split was repeated on a 100,000-flow sample where all sixteen
+fit, with AdaBoost and linear SVM added back in.
+
+| Model | Accuracy | Macro F1 | Fit | Flows/s |
+|---|---|---|---|---|
+| XGBoost | 0.9972 | 0.8963 | 20 s | 89,877 |
+| CatBoost | 0.9971 | 0.8731 | 192 s | 269,401 |
+| Decision Tree | 0.9959 | 0.8432 | 6 s | 1,220,114 |
+| Random Forest | 0.9962 | 0.8393 | 10 s | 91,442 |
+| KNN | 0.9836 | 0.7092 | 0 s | 5,031 |
+| MLP | 0.9809 | 0.6886 | 16 s | 583,536 |
+| Logistic Regression | 0.9702 | 0.5854 | 6 s | 849,770 |
+| Hist. Gradient Boosting | 0.9766 | 0.5252 | 5 s | 103,003 |
+| Linear SVM | 0.9657 | 0.5239 | 309 s | 698,100 |
+| SVM (RBF) | 0.9634 | 0.4723 | 35 s | 1,305 |
+| LDA | 0.9030 | 0.4668 | 2 s | 339,855 |
+| Naive Bayes | 0.7042 | 0.4312 | 1 s | 101,628 |
+| SGD | 0.9590 | 0.3822 | 4 s | 360,094 |
+| QDA | 0.5834 | 0.3314 | 1 s | 35,693 |
+| LightGBM | 0.8330 | 0.1448 | 10 s | 40,893 |
+| AdaBoost | 0.8895 | 0.1157 | 41 s | 28,644 |
+
+- **KNN is competitive on accuracy** (macro F1 0.709, ahead of several models that train
+  far faster), so excluding it from the large run was a cost decision, not a quality one.
+- **KNN and SVM are by far the slowest to classify**: 5,031 and 1,305 flows per second
+  against the decision tree's 1.2 million, a difference of roughly 900 times. For an IDS
+  that must keep pace with a live link, that settles the matter whatever the accuracy.
+  KNN in particular has no real training step and pays the whole cost at prediction time,
+  which is the worst shape for this application.
+- **The ranking among the leaders shifts with sample size**: XGBoost leads here while the
+  decision tree leads on the larger sample. The top few are within a few points of each
+  other, so the exact order should not be read as settled.
+
 ## Handling the class imbalance
 
 Each strategy is applied to the training split only; the test split keeps the
