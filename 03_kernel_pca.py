@@ -37,7 +37,8 @@ from sklearn.decomposition import KernelPCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression, SGDClassifier
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import (accuracy_score, f1_score, precision_score,
+                             recall_score)
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
@@ -103,6 +104,12 @@ def classify(clf_key, Ztr, ytr, Zte, yte):
     pred = make().fit(Ztr, ytr).predict(Zte)
     return code, {
         "accuracy": round(accuracy_score(yte, pred), 4),
+        # macro averages weight all fifteen classes equally, so a model that
+        # ignores the rare attacks cannot hide behind the benign majority
+        "macro_precision": round(precision_score(yte, pred, average="macro",
+                                                 zero_division=0), 4),
+        "macro_recall": round(recall_score(yte, pred, average="macro",
+                                           zero_division=0), 4),
         "macro_f1": round(f1_score(yte, pred, average="macro", zero_division=0), 4),
         "clf_seconds": round(time.time() - t0, 1),
     }
@@ -121,7 +128,9 @@ def write_excel(df, path, clf_order):
     index = ["classifier", "components", "kernel"] + (["gamma_label"] if tuned else [])
 
     with pd.ExcelWriter(path, engine="openpyxl") as xl:
-        for metric in ("accuracy", "macro_f1"):
+        for metric in ("accuracy", "macro_precision", "macro_recall", "macro_f1"):
+            if metric not in d.columns:      # older result files predate these
+                continue
             piv = d.pivot_table(index=index, columns="test_size", values=metric, sort=False)
             piv.columns = [f"test {c}" for c in piv.columns]
             piv = piv.rename(index={0: "all"}, level="components")
