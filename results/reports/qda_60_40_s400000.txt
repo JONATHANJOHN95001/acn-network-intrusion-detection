@@ -2,7 +2,7 @@ qda  split 60/40
 
                             precision    recall  f1-score   support
 
-                    BENIGN     0.9977    0.2817    0.4393    133529
+                    BENIGN     0.9977    0.2817    0.4394    133529
                        Bot     0.0005    0.2479    0.0010       121
                       DDoS     0.7725    0.6301    0.6941      7957
              DoS GoldenEye     0.3671    0.2379    0.2887       639
@@ -18,13 +18,13 @@ qda  split 60/40
 Web Attack - Sql Injection     0.0004    0.5556    0.0008         9
           Web Attack - XSS     0.0362    0.9500    0.0698        40
 
-                  accuracy                         0.3664    160022
-                 macro avg     0.3213    0.5864    0.3108    160022
-              weighted avg     0.9390    0.3664    0.4793    160022
+                  accuracy                         0.3665    160022
+                 macro avg     0.3213    0.5864    0.3109    160022
+              weighted avg     0.9390    0.3665    0.4794    160022
 
 
 Confusion matrix (rows = true, cols = predicted)
-[[37610 59422   721   261  2836   779  1516  4127     0   419  6705  3258
+[[37617 59417   721   261  2836   779  1516  4125     0   419  6705  3258
    2467 12508   900]
  [    0    30     0     0     0     0     0     0     0     2    78     8
       2     1     0]

@@ -2,14 +2,14 @@ Duplicate-row leakage, full dataset, 60/40 split
 
 duplicates kept (as most published work does)
   test rows also present in training: 13.2%
-  decision_tree   overall acc 0.9985  macroF1 0.8671   acc on leaked 0.9994  acc on unseen 0.9983
-  random_forest   overall acc 0.9986  macroF1 0.8621   acc on leaked 0.9998  acc on unseen 0.9984
+  decision_tree   overall acc 0.9984  macroF1 0.8564   acc on leaked 0.9994  acc on unseen 0.9983
+  random_forest   overall acc 0.9986  macroF1 0.8570   acc on leaked 0.9998  acc on unseen 0.9984
 
 duplicates removed (this project)
   test rows also present in training: 3.5%
-  decision_tree   overall acc 0.9982  macroF1 0.8958   acc on leaked 1.0000  acc on unseen 0.9981
-  random_forest   overall acc 0.9983  macroF1 0.8679   acc on leaked 1.0000  acc on unseen 0.9982
+  decision_tree   overall acc 0.9982  macroF1 0.8638   acc on leaked 1.0000  acc on unseen 0.9981
+  random_forest   overall acc 0.9983  macroF1 0.8671   acc on leaked 1.0000  acc on unseen 0.9983
 
 Memorisation gap (accuracy on leaked rows minus accuracy on unseen rows):
-  decision_tree   gap +0.0011   contribution to the reported accuracy +0.0001
+  decision_tree   gap +0.0012   contribution to the reported accuracy +0.0002
   random_forest   gap +0.0014   contribution to the reported accuracy +0.0002

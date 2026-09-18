@@ -1,22 +1,22 @@
 Random Forest, 310,160-flow stratified sample, 70/30 split
-held-out macro F1: 0.8877
+held-out macro F1: 0.8912
 
 Top 15 features by permutation importance (drop in macro F1 when shuffled):
-  Destination Port               0.0213 +/- 0.0022   impurity 0.0417
-  Init_Win_bytes_forward         0.0203 +/- 0.0007   impurity 0.0195
-  Init_Win_bytes_backward        0.0142 +/- 0.0019   impurity 0.0160
-  Fwd IAT Min                    0.0074 +/- 0.0012   impurity 0.0136
-  Fwd IAT Std                    0.0054 +/- 0.0009   impurity 0.0108
-  URG Flag Count                 0.0048 +/- 0.0002   impurity 0.0011
-  Avg Bwd Segment Size           0.0035 +/- 0.0018   impurity 0.0406
-  Packet Length Std              0.0020 +/- 0.0003   impurity 0.0450
-  Packet Length Variance         0.0018 +/- 0.0002   impurity 0.0426
-  Average Packet Size            0.0017 +/- 0.0004   impurity 0.0491
-  Flow IAT Min                   0.0015 +/- 0.0006   impurity 0.0079
-  Packet Length Mean             0.0015 +/- 0.0001   impurity 0.0232
-  Total Length of Bwd Packets    0.0014 +/- 0.0001   impurity 0.0429
-  Fwd IAT Mean                   0.0014 +/- 0.0011   impurity 0.0115
-  Subflow Bwd Bytes              0.0013 +/- 0.0002   impurity 0.0358
+  Init_Win_bytes_forward         0.0184 +/- 0.0024   impurity 0.0165
+  Destination Port               0.0182 +/- 0.0014   impurity 0.0425
+  Init_Win_bytes_backward        0.0154 +/- 0.0004   impurity 0.0164
+  Fwd IAT Min                    0.0087 +/- 0.0009   impurity 0.0125
+  Avg Bwd Segment Size           0.0084 +/- 0.0052   impurity 0.0413
+  Fwd IAT Std                    0.0049 +/- 0.0009   impurity 0.0122
+  Fwd Header Length              0.0029 +/- 0.0004   impurity 0.0215
+  URG Flag Count                 0.0026 +/- 0.0001   impurity 0.0015
+  Flow IAT Std                   0.0025 +/- 0.0013   impurity 0.0142
+  Flow IAT Min                   0.0021 +/- 0.0011   impurity 0.0069
+  Average Packet Size            0.0021 +/- 0.0003   impurity 0.0475
+  Packet Length Std              0.0016 +/- 0.0003   impurity 0.0417
+  Fwd IAT Total                  0.0015 +/- 0.0008   impurity 0.0134
+  Total Length of Bwd Packets    0.0014 +/- 0.0001   impurity 0.0374
+  Bwd Packets/s                  0.0013 +/- 0.0007   impurity 0.0106
 
 Identical feature pairs:
   Total Fwd Packets  ==  Subflow Fwd Packets

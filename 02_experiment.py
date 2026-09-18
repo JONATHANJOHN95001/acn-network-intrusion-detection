@@ -202,7 +202,7 @@ def load(sample=None, floor=50):
 
 
 def build(cfg):
-    steps = [("impute", SimpleImputer(strategy="median"))]
+    steps = [("impute", SimpleImputer(strategy="mean"))]
     if cfg["scale"]:
         steps.append(("scale", StandardScaler()))
     steps.append(("clf", cfg["make"]()))

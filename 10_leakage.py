@@ -74,7 +74,7 @@ def run(parquet, label):
     print(f"test rows that also appear in training: {leaked.sum():,} of {len(te):,} "
           f"({share:.1%})")
 
-    imp = SimpleImputer(strategy="median").fit(X[tr])
+    imp = SimpleImputer(strategy="mean").fit(X[tr])
     Xtr, Xte = imp.transform(X[tr]), imp.transform(X[te])
     ytr, yte = y[tr], y[te]
     del X

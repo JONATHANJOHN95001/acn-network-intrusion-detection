@@ -120,7 +120,7 @@ def main():
     print(f"redundant pairs (|r| >= 0.99): {len(red)}, identical copies: {int(red['identical'].sum())}")
 
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.3, random_state=SEED, stratify=y)
-    imputer = SimpleImputer(strategy="median").fit(Xtr)
+    imputer = SimpleImputer(strategy="mean").fit(Xtr)
     Xtr = pd.DataFrame(imputer.transform(Xtr), columns=X.columns)
     Xte = pd.DataFrame(imputer.transform(Xte), columns=X.columns)
     rf = RandomForestClassifier(n_estimators=100, criterion="entropy", n_jobs=N_JOBS,

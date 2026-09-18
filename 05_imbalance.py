@@ -106,7 +106,7 @@ def main():
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=a.test_size, random_state=SEED,
                                           stratify=y)
     del X
-    imputer = SimpleImputer(strategy="median").fit(Xtr)
+    imputer = SimpleImputer(strategy="mean").fit(Xtr)
     Xtr = imputer.transform(Xtr).astype(np.float32)
     Xte = imputer.transform(Xte).astype(np.float32)
     print(f"train {len(ytr):,} / test {len(yte):,} rows, {len(classes)} classes, "

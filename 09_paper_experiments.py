@@ -85,7 +85,7 @@ MODELS = {
 def evaluate(X, y, classes, scale, make):
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=TEST_SIZE,
                                           random_state=SEED, stratify=y)
-    steps = [("impute", SimpleImputer(strategy="median"))]
+    steps = [("impute", SimpleImputer(strategy="mean"))]
     if scale:
         steps.append(("scale", StandardScaler()))
     steps.append(("clf", make()))

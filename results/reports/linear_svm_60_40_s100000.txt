@@ -4,7 +4,7 @@ linear_svm  split 60/40
 
                     BENIGN     0.9784    0.9812    0.9798     33383
                        Bot     0.0000    0.0000    0.0000        31
-                      DDoS     0.9905    0.8954    0.9406      1989
+                      DDoS     0.9905    0.8944    0.9400      1989
              DoS GoldenEye     0.9481    0.8000    0.8678       160
                   DoS Hulk     0.9943    0.9013    0.9455      2686
           DoS Slowhttptest     0.8118    0.8519    0.8313        81
@@ -18,9 +18,9 @@ linear_svm  split 60/40
 Web Attack - Sql Injection     0.0000    0.0000    0.0000         8
           Web Attack - XSS     0.0000    0.0000    0.0000        20
 
-                  accuracy                         0.9657     40036
+                  accuracy                         0.9656     40036
                  macro avg     0.5639    0.5210    0.5239     40036
-              weighted avg     0.9664    0.9657    0.9648     40036
+              weighted avg     0.9663    0.9656    0.9648     40036
 
 
 Confusion matrix (rows = true, cols = predicted)
@@ -28,7 +28,7 @@ Confusion matrix (rows = true, cols = predicted)
       1     0     0]
  [   21     0     0     0     0     0     0     0     0     0    10     0
       0     0     0]
- [  207     0  1781     1     0     0     0     0     0     0     0     0
+ [  209     0  1779     1     0     0     0     0     0     0     0     0
       0     0     0]
  [   32     0     0   128     0     0     0     0     0     0     0     0
       0     0     0]
